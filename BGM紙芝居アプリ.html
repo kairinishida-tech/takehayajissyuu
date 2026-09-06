@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>BGM紙芝居アプリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#2b2a28;
+    --paper:#f3ecd9;
+    --paper-shadow:#e3d9bd;
+    --night:#1c2138;
+    --night-2:#232946;
+    --dusk:#3e4c6d;
+    --dusk-2:#4d5d84;
+    --ember:#c4622d;
+    --ember-deep:#a44e22;
+    --reed:#4f6f52;
+    --gold:#d9b45c;
+    --gold-soft:#efd99a;
+    --line:#c9bd9c;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, var(--dusk-2) 0%, transparent 60%),
+      linear-gradient(180deg, var(--night) 0%, var(--night-2) 55%, #171a2c 100%);
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 60px;
+  }
+  .app{ width:100%; max-width:760px; }
+
+  header{ text-align:center; margin-bottom:18px; }
+  header h1{
+    font-family:"Shippori Mincho", serif;
+    font-weight:700;
+    color:var(--gold-soft);
+    font-size:1.5rem;
+    letter-spacing:.04em;
+    margin:0 0 6px;
+  }
+  header p{
+    color:#b9c0d6;
+    font-size:.85rem;
+    margin:0;
+    line-height:1.7;
+  }
+
+  /* mode tabs */
+  .tabbar{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    margin-top:18px;
+  }
+  .tab{
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    font-size:.88rem;
+    font-weight:700;
+    background:#20253e;
+    border:1px solid var(--dusk-2);
+    color:#a9b1cf;
+    padding:10px 18px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  .tab.active{
+    background:var(--ember);
+    border-color:var(--ember);
+    color:#fff;
+  }
+
+  [hidden]{ display:none !important; }
+
+  /* ---- prep view ---- */
+  .panel{
+    background:#20253e;
+    border:1px solid var(--dusk-2);
+    border-radius:14px;
+    padding:18px 18px 20px;
+    margin:18px 0;
+  }
+  .panel h2{
+    font-family:"Shippori Mincho", serif;
+    font-size:1rem;
+    color:var(--gold-soft);
+    margin:0 0 6px;
+    font-weight:700;
+  }
+  .panel-note{
+    font-size:.78rem;
+    color:#9aa2c2;
+    line-height:1.7;
+    margin:0 0 14px;
+  }
+
+  .slots{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:10px;
+  }
+  @media (max-width:560px){ .slots{ grid-template-columns:repeat(2,1fr); } }
+  .slot{
+    background:#181c30;
+    border:1px solid var(--dusk-2);
+    border-radius:10px;
+    padding:12px 10px;
+    text-align:center;
+  }
+  .slot .letter{
+    font-family:"Shippori Mincho", serif;
+    font-size:1.3rem;
+    color:var(--gold);
+    font-weight:700;
+  }
+  .slot .status{
+    font-size:.7rem;
+    color:#8891b3;
+    margin:4px 0 10px;
+    min-height:2.2em;
+    line-height:1.4;
+    word-break:break-all;
+  }
+  .slot.filled .status{ color:#bcd6c2; }
+  .slot label.upload{
+    display:block;
+    font-size:.78rem;
+    background:var(--dusk);
+    color:#e4e8f5;
+    padding:7px 4px;
+    border-radius:6px;
+    cursor:pointer;
+  }
+  .slot label.upload:hover{ background:var(--dusk-2); }
+  .slot input[type=file]{ display:none; }
+  .slot button.preview{
+    margin-top:6px;
+    width:100%;
+    background:transparent;
+    border:1px solid var(--reed);
+    color:#bcd6c2;
+    border-radius:6px;
+    padding:5px 4px;
+    font-size:.75rem;
+    cursor:pointer;
+  }
+  .slot button.preview:disabled{ opacity:.35; cursor:not-allowed; }
+
+  .thumb{
+    width:100%;
+    aspect-ratio:4/3;
+    background:#0f1122;
+    border-radius:6px;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:8px 0;
+  }
+  .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .thumb .ph-empty{ color:#4a5170; font-size:1.6rem; line-height:1; }
+
+  .prep-cta-row{ text-align:center; margin-top:6px; }
+
+  /* ---- activity view (kamishibai) ---- */
+  .toolbar{
+    display:flex;
+    justify-content:center;
+    margin-bottom:14px;
+  }
+
+  .stage-wrap{ position:relative; }
+  .frame{
+    position:relative;
+    background:linear-gradient(180deg, #4a3826, #362a1c);
+    border-radius:18px;
+    padding:14px;
+    box-shadow:0 20px 45px rgba(0,0,0,.45), inset 0 0 0 1px #5c4632;
+  }
+  .card{
+    display:none;
+    background:var(--paper);
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:inset 0 0 0 1px var(--paper-shadow);
+  }
+  .card.active{ display:block; animation:cardIn .35s ease; }
+  @keyframes cardIn{
+    from{ opacity:0; transform:translateY(6px) scale(.99); }
+    to{ opacity:1; transform:none; }
+  }
+
+  .illust{
+    width:100%;
+    aspect-ratio:16/9;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--paper-shadow);
+  }
+  .illust img{ width:100%; height:100%; object-fit:contain; display:block; }
+  .illust .ph-empty{
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    color:#a49d84;
+    font-size:.85rem;
+    text-align:center;
+    line-height:1.8;
+  }
+  .illust .ph-empty .icon{ font-size:2rem; display:block; }
+
+  .card-body{ padding:18px 20px 22px; }
+  .scene-tag{
+    display:inline-block;
+    font-family:"Shippori Mincho", serif;
+    font-size:.78rem;
+    color:#fff;
+    background:var(--ember);
+    padding:3px 12px;
+    border-radius:999px;
+    margin-bottom:12px;
+    letter-spacing:.05em;
+  }
+
+  .picker-label{
+    font-size:.85rem;
+    color:#6b6656;
+    margin:0 0 8px;
+    font-weight:500;
+  }
+  .picker{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:8px;
+  }
+  .bgm-btn{
+    position:relative;
+    background:#fff;
+    border:2px solid var(--line);
+    border-radius:10px;
+    padding:10px 4px 8px;
+    text-align:center;
+    cursor:pointer;
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    transition:border-color .12s, background .12s;
+  }
+  .bgm-btn .bl{
+    font-family:"Shippori Mincho", serif;
+    font-size:1.15rem;
+    font-weight:700;
+    color:var(--ink);
+    display:block;
+  }
+  .bgm-btn .bs{
+    font-size:.65rem;
+    color:#8a8470;
+    display:block;
+    margin-top:2px;
+  }
+  .bgm-btn.selected{ border-color:var(--reed); background:#e9f0e6; }
+  .bgm-btn.selected .bs{ color:var(--reed); font-weight:700; }
+  .bgm-btn.empty{ opacity:.4; cursor:not-allowed; }
+
+  .nav-arrow{
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    background:rgba(0,0,0,.35);
+    border:none;
+    color:#f3ecd9;
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    font-size:1.1rem;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .nav-arrow:hover{ background:rgba(0,0,0,.55); }
+  .nav-arrow.prev{ left:-6px; }
+  .nav-arrow.next{ right:-6px; }
+  .nav-arrow:disabled{ opacity:.25; cursor:not-allowed; }
+
+  .dots{
+    display:flex;
+    justify-content:center;
+    gap:9px;
+    margin:16px 0 26px;
+  }
+  .dot{
+    width:10px; height:10px; border-radius:50%;
+    background:var(--dusk-2);
+    cursor:pointer;
+    border:none;
+    padding:0;
+  }
+  .dot.done{ background:var(--reed); }
+  .dot.active{ background:var(--gold); width:26px; border-radius:6px; }
+
+  .cta-row{ text-align:center; }
+  .cta{
+    font-family:"Shippori Mincho", serif;
+    font-size:1rem;
+    font-weight:700;
+    background:var(--ember);
+    color:#fff;
+    border:none;
+    padding:13px 34px;
+    border-radius:999px;
+    cursor:pointer;
+    box-shadow:0 8px 20px rgba(196,98,45,.35);
+  }
+  .cta:disabled{
+    background:#4a4638;
+    box-shadow:none;
+    cursor:not-allowed;
+    opacity:.6;
+  }
+  .cta-sub{ font-size:.78rem; color:#8891b3; margin-top:8px; }
+
+  .ghost-btn{
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    background:transparent;
+    border:1px solid var(--dusk-2);
+    color:#c7cee6;
+    padding:9px 16px;
+    border-radius:8px;
+    font-size:.85rem;
+    cursor:pointer;
+    transition:border-color .15s, color .15s;
+  }
+  .ghost-btn:hover{ border-color:var(--gold); color:var(--gold-soft); }
+
+  /* playback overlay */
+  .overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:#0e1120;
+    z-index:50;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .overlay.show{ display:flex; }
+  .ov-stage{
+    width:100%;
+    max-width:820px;
+    aspect-ratio:16/9;
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);
+    position:relative;
+    background:#05070f;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .ov-stage img{ width:100%; height:100%; object-fit:contain; display:block; }
+  .ov-caption{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    background:linear-gradient(0deg, rgba(0,0,0,.65), transparent);
+    color:#f3ecd9;
+    padding:16px 20px 12px;
+    font-family:"Shippori Mincho", serif;
+    font-size:1rem;
+  }
+  .ov-progress{
+    display:flex;
+    gap:6px;
+    width:100%;
+    max-width:820px;
+    margin-top:14px;
+  }
+  .ov-seg{
+    flex:1;
+    height:5px;
+    background:#2c3150;
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .ov-seg i{
+    display:block;
+    height:100%;
+    width:0%;
+    background:var(--gold);
+    transition:width linear;
+  }
+  .ov-seg.filled i{ width:100%; transition:none; }
+  .ov-controls{
+    margin-top:18px;
+    display:flex;
+    gap:12px;
+  }
+  .ov-btn{
+    background:#232946;
+    border:1px solid var(--dusk-2);
+    color:#e4e8f5;
+    padding:9px 20px;
+    border-radius:999px;
+    font-size:.85rem;
+    cursor:pointer;
+    font-family:"Zen Kaku Gothic New", sans-serif;
+  }
+  .ov-end{
+    text-align:center;
+    color:var(--gold-soft);
+    font-family:"Shippori Mincho", serif;
+  }
+  .ov-end h3{ font-size:1.3rem; margin-bottom:6px; }
+  .ov-end p{ color:#b9c0d6; font-size:.85rem; font-family:"Zen Kaku Gothic New", sans-serif; }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>BGM紙芝居アプリ</h1>
+    <p>写真とBGMを組み合わせて、紙芝居をつくろう</p>
+    <div class="tabbar">
+      <button class="tab active" id="tabPrep">① じゅんび（先生用）</button>
+      <button class="tab" id="tabActivity">② かつどう（こども用）</button>
+    </div>
+  </header>
+
+  <!-- ===== 準備画面（教師） ===== -->
+  <section id="prepView">
+    <div class="panel">
+      <h2>写真を4枚よみこむ</h2>
+      <p class="panel-note">4コマ漫画の1コマずつになる写真を、①〜④の順にアップロードしてください。</p>
+      <div class="slots" id="photoSlots"></div>
+    </div>
+
+    <div class="panel">
+      <h2>BGMを4つよみこむ</h2>
+      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを4つ用意してください（A〜Dの並び順に意味はありません）。音声はブラウザ内だけで使われ、保存はされません。</p>
+      <div class="slots" id="audioSlots"></div>
+    </div>
+
+    <div class="prep-cta-row">
+      <button class="ghost-btn" id="goActivityBtn">かつどう画面にすすむ →</button>
+    </div>
+  </section>
+
+  <!-- ===== 活動画面（児童） ===== -->
+  <section id="activityView" hidden>
+    <div class="toolbar">
+      <button class="ghost-btn" id="backPrepBtn">← じゅんび画面にもどる</button>
+    </div>
+
+    <div class="stage-wrap">
+      <div class="frame">
+        <button class="nav-arrow prev" id="prevBtn" aria-label="前の場面">‹</button>
+        <button class="nav-arrow next" id="nextBtn" aria-label="次の場面">›</button>
+        <div id="cardHost"></div>
+      </div>
+    </div>
+
+    <div class="dots" id="dots"></div>
+
+    <div class="cta-row">
+      <button class="cta" id="playAllBtn" disabled>紙芝居アニメで見る</button>
+      <div class="cta-sub" id="ctaSub">4つの場面すべてでBGMを選ぶと再生できます</div>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ov-stage" id="ovStage"></div>
+  <div class="ov-progress" id="ovProgress"></div>
+  <div class="ov-controls">
+    <button class="ov-btn" id="ovClose">とじる</button>
+    <button class="ov-btn" id="ovNext">つぎへ</button>
+    <button class="ov-btn" id="ovReplay">もう一度さいせい</button>
+  </div>
+</div>
+
+<script>
+/* ---------- constants ---------- */
+const PANEL_COUNT = 4;
+const LETTERS = ["A","B","C","D"];
+
+/* ---------- state ---------- */
+let photos = [null,null,null,null];     // {url,name}
+let audioSlots = [null,null,null,null]; // {url,name,el}
+let assign = [null,null,null,null];     // letter assigned to each panel, or null
+let current = 0;          // current panel index in activity view
+let currentPreview = null;
+let playToken = 0;
+
+/* ---------- helpers ---------- */
+function photoBoxHTML(idx, emptyIcon){
+  const p = photos[idx];
+  if(p) return `<img src="${p.url}" alt="${idx+1}コマ目の写真">`;
+  return `<div class="ph-empty"><span class="icon">${emptyIcon||'🖼'}</span>写真じゅんび中</div>`;
+}
+
+/* ============================================================
+   準備画面：写真スロット
+   ============================================================ */
+const photoSlotsEl = document.getElementById('photoSlots');
+for(let i=0;i<PANEL_COUNT;i++){
+  const div = document.createElement('div');
+  div.className = 'slot';
+  div.id = 'photoSlot'+i;
+  div.innerHTML = `
+    <span class="letter">${i+1}</span>
+    <div class="thumb" id="thumb${i}"><span class="ph-empty">🖼</span></div>
+    <div class="status" id="pstatus${i}">未読み込み</div>
+    <label class="upload">写真を選ぶ
+      <input type="file" accept="image/*" data-idx="${i}">
+    </label>
+  `;
+  photoSlotsEl.appendChild(div);
+}
+photoSlotsEl.addEventListener('change', (e)=>{
+  if(e.target.type !== 'file') return;
+  const idx = +e.target.dataset.idx;
+  const file = e.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  photos[idx] = { url, name:file.name };
+  const slotDiv = document.getElementById('photoSlot'+idx);
+  slotDiv.classList.add('filled');
+  document.getElementById('thumb'+idx).innerHTML = `<img src="${url}" alt="">`;
+  document.getElementById('pstatus'+idx).textContent = file.name;
+  renderActivityView(); // keep activity view in sync
+});
+
+/* ============================================================
+   準備画面：BGMスロット
+   ============================================================ */
+const audioSlotsEl = document.getElementById('audioSlots');
+LETTERS.forEach((L,i)=>{
+  const div = document.createElement('div');
+  div.className = 'slot';
+  div.id = 'audioSlot'+i;
+  div.innerHTML = `
+    <span class="letter">${L}</span>
+    <div class="status" id="astatus${i}">未読み込み</div>
+    <label class="upload">音声を選ぶ
+      <input type="file" accept="audio/*" data-idx="${i}">
+    </label>
+    <button class="preview" disabled data-idx="${i}">▶ ためし聞き</button>
+  `;
+  audioSlotsEl.appendChild(div);
+});
+audioSlotsEl.addEventListener('change', (e)=>{
+  if(e.target.type !== 'file') return;
+  const idx = +e.target.dataset.idx;
+  const file = e.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  if(audioSlots[idx] && audioSlots[idx].el){ audioSlots[idx].el.pause(); }
+  const el = new Audio(url);
+  el.preload = 'auto';
+  audioSlots[idx] = { url, name:file.name, el };
+  const slotDiv = document.getElementById('audioSlot'+idx);
+  slotDiv.classList.add('filled');
+  document.getElementById('astatus'+idx).textContent = file.name;
+  const pbtn = slotDiv.querySelector('.preview');
+  pbtn.disabled = false;
+  renderActivityView(); // refresh bgm buttons enabled state (keeps existing assignments)
+});
+audioSlotsEl.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button.preview');
+  if(!btn || btn.disabled) return;
+  playPreview(+btn.dataset.idx);
+});
+function playPreview(idx){
+  if(!audioSlots[idx]) return;
+  if(currentPreview){ currentPreview.pause(); currentPreview.currentTime = 0; }
+  const el = audioSlots[idx].el;
+  el.currentTime = 0;
+  el.play().catch(()=>{});
+  currentPreview = el;
+}
+
+/* ============================================================
+   モード切り替え（準備 ⇔ 活動）
+   ============================================================ */
+const tabPrep = document.getElementById('tabPrep');
+const tabActivity = document.getElementById('tabActivity');
+const prepView = document.getElementById('prepView');
+const activityView = document.getElementById('activityView');
+
+function showPrep(){
+  prepView.hidden = false;
+  activityView.hidden = true;
+  tabPrep.classList.add('active');
+  tabActivity.classList.remove('active');
+  if(currentPreview){ currentPreview.pause(); }
+}
+function showActivity(){
+  renderActivityView();
+  prepView.hidden = true;
+  activityView.hidden = false;
+  tabPrep.classList.remove('active');
+  tabActivity.classList.add('active');
+  if(currentPreview){ currentPreview.pause(); }
+}
+tabPrep.addEventListener('click', showPrep);
+tabActivity.addEventListener('click', showActivity);
+document.getElementById('goActivityBtn').addEventListener('click', showActivity);
+document.getElementById('backPrepBtn').addEventListener('click', showPrep);
+
+/* ============================================================
+   活動画面：4コマカード
+   ============================================================ */
+const cardHost = document.getElementById('cardHost');
+let activityBuilt = false;
+
+function renderActivityView(){
+  cardHost.innerHTML = '';
+  for(let i=0;i<PANEL_COUNT;i++){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'card'+i;
+    card.innerHTML = `
+      <div class="illust" id="illust${i}">${photoBoxHTML(i)}</div>
+      <div class="card-body">
+        <span class="scene-tag">${i+1}コマ目</span>
+        <p class="picker-label">この場面に合うBGMは？</p>
+        <div class="picker" id="picker${i}"></div>
+      </div>
+    `;
+    cardHost.appendChild(card);
+
+    const picker = card.querySelector('#picker'+i);
+    LETTERS.forEach((L, li)=>{
+      const b = document.createElement('button');
+      b.className = 'bgm-btn';
+      b.dataset.letter = L;
+      b.innerHTML = `<span class="bl">${L}</span><span class="bs">▶ 聞く</span>`;
+      b.addEventListener('click', ()=> onBgmClick(i, li));
+      picker.appendChild(b);
+    });
+  }
+  if(current >= PANEL_COUNT) current = 0;
+  renderCard(current);
+  updateDots();
+  updateCta();
+}
+
+function onBgmClick(panelIdx, letterIdx){
+  if(!audioSlots[letterIdx]){
+    return; // 未読み込みのBGMは選べない
+  }
+  assign[panelIdx] = LETTERS[letterIdx];
+  refreshPickerUI(panelIdx);
+  playPreview(letterIdx);
+  updateDots();
+  updateCta();
+}
+
+function refreshPickerUI(panelIdx){
+  const picker = document.getElementById('picker'+panelIdx);
+  if(!picker) return;
+  [...picker.children].forEach((b,li)=>{
+    b.classList.toggle('selected', assign[panelIdx] === LETTERS[li]);
+    b.classList.toggle('empty', !audioSlots[li]);
+  });
+}
+
+function renderCard(i){
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('active'));
+  const el = document.getElementById('card'+i);
+  if(el) el.classList.add('active');
+  refreshPickerUI(i);
+  document.getElementById('prevBtn').disabled = (i===0);
+  document.getElementById('nextBtn').disabled = (i===PANEL_COUNT-1);
+}
+
+/* dots */
+const dotsEl = document.getElementById('dots');
+for(let i=0;i<PANEL_COUNT;i++){
+  const d = document.createElement('button');
+  d.className = 'dot';
+  d.addEventListener('click', ()=>{ current=i; renderCard(i); updateDots(); });
+  dotsEl.appendChild(d);
+}
+function updateDots(){
+  [...dotsEl.children].forEach((d,i)=>{
+    d.classList.toggle('active', i===current);
+    d.classList.toggle('done', !!assign[i]);
+  });
+}
+
+/* nav */
+document.getElementById('prevBtn').addEventListener('click', ()=>{
+  if(current>0){ current--; renderCard(current); updateDots(); }
+});
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  if(current<PANEL_COUNT-1){ current++; renderCard(current); updateDots(); }
+});
+
+/* cta */
+const playAllBtn = document.getElementById('playAllBtn');
+const ctaSub = document.getElementById('ctaSub');
+function updateCta(){
+  const allSet = assign.every(a => !!a);
+  playAllBtn.disabled = !allSet;
+  ctaSub.textContent = allSet ? "準備できました。紙芝居アニメで見てみよう" : "4つの場面すべてでBGMを選ぶと再生できます";
+}
+
+/* ============================================================
+   再生（紙芝居アニメ）
+   ============================================================ */
+const overlay = document.getElementById('overlay');
+const ovStage = document.getElementById('ovStage');
+const ovProgress = document.getElementById('ovProgress');
+
+playAllBtn.addEventListener('click', startPlayback);
+document.getElementById('ovClose').addEventListener('click', closeOverlay);
+document.getElementById('ovReplay').addEventListener('click', startPlayback);
+document.getElementById('ovNext').addEventListener('click', ()=>{
+  playToken++; // force current segment to bail out
+  const t = ++playToken;
+  playSequence(manualNextIdx, t);
+});
+let manualNextIdx = 0;
+
+function closeOverlay(){
+  playToken++; // invalidate any running sequence
+  overlay.classList.remove('show');
+  if(currentPreview){ currentPreview.pause(); }
+}
+
+function unlockAllAudio(){
+  // iPad Safari: play()+pause() inside the same user-gesture call stack
+  // unlocks each <audio> element so later programmatic play() calls succeed.
+  // Must FULLY FINISH (all promises settled) before real playback starts,
+  // otherwise a late unlock-pause can race with and stop panel 1's playback.
+  const tasks = audioSlots.map(slot=>{
+    if(!slot) return Promise.resolve();
+    const el = slot.el;
+    let p;
+    try{ p = el.play(); }catch(e){ return Promise.resolve(); }
+    if(p && p.then){
+      return p.then(()=>{ el.pause(); el.currentTime = 0; }).catch(()=>{});
+    }
+    el.pause(); el.currentTime = 0;
+    return Promise.resolve();
+  });
+  return Promise.all(tasks);
+}
+
+async function startPlayback(){
+  await unlockAllAudio();
+  overlay.classList.add('show');
+  const myToken = ++playToken;
+  ovProgress.innerHTML = '';
+  for(let i=0;i<PANEL_COUNT;i++){
+    const seg = document.createElement('div');
+    seg.className = 'ov-seg';
+    seg.innerHTML = '<i></i>';
+    ovProgress.appendChild(seg);
+  }
+  playSequence(0, myToken);
+}
+
+function playSequence(idx, token){
+  if(token !== playToken) return;
+  if(idx >= PANEL_COUNT){
+    showEnd();
+    return;
+  }
+  manualNextIdx = idx+1;
+
+  ovStage.innerHTML = photoBoxHTML(idx, '🖼') + `<div class="ov-caption">${idx+1}コマ目</div>`;
+
+  const segs = ovProgress.children;
+  [...segs].forEach((s,i)=>{
+    s.classList.toggle('filled', i<idx);
+    if(i===idx){ s.classList.remove('filled'); s.querySelector('i').style.transition='none'; s.querySelector('i').style.width='0%'; }
+  });
+
+  const letter = assign[idx];
+  const letterIdx = letter ? LETTERS.indexOf(letter) : -1;
+  const slot = letterIdx>=0 ? audioSlots[letterIdx] : null;
+
+  let audioEl = null;
+  let settled = false;
+  let timer = null;
+
+  function cleanup(){
+    if(settled) return;
+    settled = true;
+    if(audioEl) audioEl.removeEventListener('ended', onEnded);
+    clearTimeout(timer);
+  }
+  function advance(){
+    if(token !== playToken) return;
+    cleanup();
+    playSequence(idx+1, token);
+  }
+  function onEnded(){ advance(); }
+
+  if(slot){
+    audioEl = slot.el;
+    audioEl.currentTime = 0;
+    audioEl.play().catch(()=>{});
+    audioEl.addEventListener('ended', onEnded);
+  }
+
+  const barDuration = slot ? 6 : 4; // seconds, visual only
+  requestAnimationFrame(()=>{
+    const bar = segs[idx].querySelector('i');
+    bar.style.transition = `width ${barDuration}s linear`;
+    bar.style.width = '100%';
+  });
+
+  // safety timeout in case audio "ended" never fires (or no BGM assigned)
+  timer = setTimeout(advance, slot ? 12000 : 4200);
+}
+
+function showEnd(){
+  ovStage.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+    <div class="ov-end"><h3>おわり</h3><p>4つの場面が終わりました</p></div>
+  </div>`;
+  [...ovProgress.children].forEach(s=>s.classList.add('filled'));
+}
+
+/* ---------- init ---------- */
+renderActivityView();
+showPrep();
+</script>
+</body>
+</html>
