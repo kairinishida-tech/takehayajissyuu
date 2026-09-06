@@ -340,6 +340,44 @@
     transition:border-color .15s, color .15s;
   }
   .ghost-btn:hover{ border-color:var(--gold); color:var(--gold-soft); }
+  .ghost-btn.danger{ border-color:var(--ember-deep); color:#f0b39a; }
+  .ghost-btn.danger:hover{ border-color:var(--ember); color:#ffd0bd; }
+
+  /* ---- password gate (teacher) ---- */
+  .pw-card{
+    background:#20253e;
+    border:1px solid var(--dusk-2);
+    border-radius:14px;
+    padding:32px 24px;
+    max-width:340px;
+    margin:60px auto 0;
+    text-align:center;
+  }
+  .pw-card h2{
+    font-family:"Shippori Mincho", serif;
+    font-size:1.05rem;
+    color:var(--gold-soft);
+    margin:0 0 8px;
+    font-weight:700;
+  }
+  .pw-card .panel-note{ margin:0 0 18px; }
+  .pw-input{
+    width:100%;
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    font-size:1rem;
+    padding:10px 14px;
+    border-radius:8px;
+    border:1px solid var(--dusk-2);
+    background:#181c30;
+    color:#e4e8f5;
+    text-align:center;
+    letter-spacing:.1em;
+  }
+  .pw-error{
+    color:#f0b39a;
+    font-size:.8rem;
+    margin-top:10px;
+  }
 
   /* playback overlay */
   .overlay{
@@ -436,8 +474,21 @@
     </div>
   </header>
 
+  <!-- ===== 先生用パスワード画面 ===== -->
+  <section id="passwordGate" hidden>
+    <div class="pw-card">
+      <h2>先生用パスワード</h2>
+      <p class="panel-note">じゅんび画面に入るにはパスワードが必要です。</p>
+      <input type="password" class="pw-input" id="pwInput" placeholder="パスワード" autocomplete="off">
+      <div class="pw-error" id="pwError" hidden>パスワードがちがいます</div>
+      <div class="prep-cta-row" style="margin-top:16px;">
+        <button class="cta" id="pwSubmitBtn">入る</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ===== 準備画面（教師） ===== -->
-  <section id="prepView">
+  <section id="prepView" hidden>
     <div class="panel">
       <h2>写真を4枚よみこむ</h2>
       <p class="panel-note">4コマ漫画の1コマずつになる写真を、①〜④の順にアップロードしてください。</p>
@@ -446,8 +497,16 @@
 
     <div class="panel">
       <h2>BGMを4つよみこむ</h2>
-      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを4つ用意してください（A〜Dの並び順に意味はありません）。音声はブラウザ内だけで使われ、保存はされません。</p>
+      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを4つ用意してください（A〜Dの並び順に意味はありません）。音声はブラウザ内だけで使われます。</p>
       <div class="slots" id="audioSlots"></div>
+    </div>
+
+    <div class="panel">
+      <h2>保存データについて</h2>
+      <p class="panel-note">アップロードした写真とBGMは、この端末のブラウザ内だけに保存され、次に開いたときも自動で読み込まれます（リポジトリやサーバーには送られません）。別の授業・別のクラスで使う前は、下のボタンで一度消去してください。</p>
+      <div class="prep-cta-row">
+        <button class="ghost-btn danger" id="resetMediaBtn">保存した写真・BGMをすべて消す</button>
+      </div>
     </div>
 
     <div class="prep-cta-row">
@@ -500,6 +559,64 @@ let assign = [null,null,null,null];     // letter assigned to each panel, or nul
 let current = 0;          // current panel index in activity view
 let currentPreview = null;
 let playToken = 0;
+let activeAudio = null;   // the <audio> currently playing as part of kamishibai auto-playback
+
+/* ============================================================
+   ブラウザ内保存（IndexedDB）
+   写真・BGMは著作権上の理由でリポジトリにはコミットしない。
+   保存先はこの端末のブラウザだけ（IndexedDB）にとどめる。
+   ============================================================ */
+const IDB_NAME = 'bgm-kamishibai';
+const IDB_VERSION = 1;
+const IDB_STORE = 'media';
+
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('IndexedDB unsupported')); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)){
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbPut(key, value){
+  try{
+    const db = await idbOpen();
+    await new Promise((resolve, reject)=>{
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(value, key);
+      tx.oncomplete = resolve;
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }catch(err){ console.warn('保存に失敗しました（IndexedDB）', err); }
+}
+async function idbGet(key){
+  try{
+    const db = await idbOpen();
+    return await new Promise((resolve, reject)=>{
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    });
+  }catch(err){ console.warn('読み込みに失敗しました（IndexedDB）', err); return undefined; }
+}
+async function idbClearAll(){
+  try{
+    const db = await idbOpen();
+    await new Promise((resolve, reject)=>{
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = resolve;
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }catch(err){ console.warn('消去に失敗しました（IndexedDB）', err); }
+}
 
 /* ---------- helpers ---------- */
 function photoBoxHTML(idx, emptyIcon){
@@ -538,6 +655,7 @@ photoSlotsEl.addEventListener('change', (e)=>{
   document.getElementById('thumb'+idx).innerHTML = `<img src="${url}" alt="">`;
   document.getElementById('pstatus'+idx).textContent = file.name;
   renderActivityView(); // keep activity view in sync
+  idbPut('photo'+idx, { name:file.name, type:file.type, blob:file }); // persist for next reload
 });
 
 /* ============================================================
@@ -574,6 +692,7 @@ audioSlotsEl.addEventListener('change', (e)=>{
   const pbtn = slotDiv.querySelector('.preview');
   pbtn.disabled = false;
   renderActivityView(); // refresh bgm buttons enabled state (keeps existing assignments)
+  idbPut('audio'+idx, { name:file.name, type:file.type, blob:file }); // persist for next reload
 });
 audioSlotsEl.addEventListener('click', (e)=>{
   const btn = e.target.closest('button.preview');
@@ -590,14 +709,63 @@ function playPreview(idx){
 }
 
 /* ============================================================
-   モード切り替え（準備 ⇔ 活動）
+   モード切り替え（準備 ⇔ 活動）＋ 先生用パスワードゲート
    ============================================================ */
+const PREP_PASSWORD = '@fterbeer';
 const tabPrep = document.getElementById('tabPrep');
 const tabActivity = document.getElementById('tabActivity');
 const prepView = document.getElementById('prepView');
 const activityView = document.getElementById('activityView');
+const passwordGate = document.getElementById('passwordGate');
+const pwInput = document.getElementById('pwInput');
+const pwError = document.getElementById('pwError');
+const pwSubmitBtn = document.getElementById('pwSubmitBtn');
+
+// タブ（=ブラウザタブ）内で一度認証したら再入力を求めない。
+// sessionStorageが使えない環境向けに、メモリ上のフラグにもフォールバックする。
+let prepAuthedMemory = false;
+function isPrepAuthed(){
+  try{ if(sessionStorage.getItem('prepAuthed') === '1') return true; }catch(e){}
+  return prepAuthedMemory;
+}
+function markPrepAuthed(){
+  prepAuthedMemory = true;
+  try{ sessionStorage.setItem('prepAuthed', '1'); }catch(e){}
+}
+
+function requestPrep(){
+  if(isPrepAuthed()){
+    showPrep();
+  } else {
+    showPasswordGate();
+  }
+}
+function showPasswordGate(){
+  passwordGate.hidden = false;
+  prepView.hidden = true;
+  activityView.hidden = true;
+  tabPrep.classList.add('active');
+  tabActivity.classList.remove('active');
+  pwError.hidden = true;
+  pwInput.value = '';
+  if(currentPreview){ currentPreview.pause(); }
+  setTimeout(()=> pwInput.focus(), 50);
+}
+function submitPassword(){
+  if(pwInput.value === PREP_PASSWORD){
+    markPrepAuthed();
+    showPrep();
+  } else {
+    pwError.hidden = false;
+    pwInput.value = '';
+    pwInput.focus();
+  }
+}
+pwSubmitBtn.addEventListener('click', submitPassword);
+pwInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') submitPassword(); });
 
 function showPrep(){
+  passwordGate.hidden = true;
   prepView.hidden = false;
   activityView.hidden = true;
   tabPrep.classList.add('active');
@@ -606,16 +774,17 @@ function showPrep(){
 }
 function showActivity(){
   renderActivityView();
+  passwordGate.hidden = true;
   prepView.hidden = true;
   activityView.hidden = false;
   tabPrep.classList.remove('active');
   tabActivity.classList.add('active');
   if(currentPreview){ currentPreview.pause(); }
 }
-tabPrep.addEventListener('click', showPrep);
+tabPrep.addEventListener('click', requestPrep);
 tabActivity.addEventListener('click', showActivity);
 document.getElementById('goActivityBtn').addEventListener('click', showActivity);
-document.getElementById('backPrepBtn').addEventListener('click', showPrep);
+document.getElementById('backPrepBtn').addEventListener('click', requestPrep);
 
 /* ============================================================
    活動画面：4コマカード
@@ -727,15 +896,27 @@ playAllBtn.addEventListener('click', startPlayback);
 document.getElementById('ovClose').addEventListener('click', closeOverlay);
 document.getElementById('ovReplay').addEventListener('click', startPlayback);
 document.getElementById('ovNext').addEventListener('click', ()=>{
-  playToken++; // force current segment to bail out
-  const t = ++playToken;
+  const t = ++playToken; // invalidate whatever segment is currently running
   playSequence(manualNextIdx, t);
 });
 let manualNextIdx = 0;
 
+// 直前のコマのBGMが鳴りっぱなしにならないよう、次のコマに進む・途中で閉じる・
+// もう一度再生する、どの経路でも必ずここを通してから次の音を鳴らす。
+function stopActiveAudio(){
+  if(activeAudio){
+    activeAudio.onended = null;
+    activeAudio.onerror = null;
+    activeAudio.pause();
+    try{ activeAudio.currentTime = 0; }catch(e){}
+    activeAudio = null;
+  }
+}
+
 function closeOverlay(){
   playToken++; // invalidate any running sequence
   overlay.classList.remove('show');
+  stopActiveAudio();
   if(currentPreview){ currentPreview.pause(); }
 }
 
@@ -759,6 +940,7 @@ function unlockAllAudio(){
 }
 
 async function startPlayback(){
+  stopActiveAudio();
   await unlockAllAudio();
   overlay.classList.add('show');
   const myToken = ++playToken;
@@ -774,6 +956,7 @@ async function startPlayback(){
 
 function playSequence(idx, token){
   if(token !== playToken) return;
+  stopActiveAudio(); // 必ず前のコマの音を止めてから、このコマに入る
   if(idx >= PANEL_COUNT){
     showEnd();
     return;
@@ -792,28 +975,31 @@ function playSequence(idx, token){
   const letterIdx = letter ? LETTERS.indexOf(letter) : -1;
   const slot = letterIdx>=0 ? audioSlots[letterIdx] : null;
 
-  let audioEl = null;
   let settled = false;
   let timer = null;
 
-  function cleanup(){
+  function advance(){
     if(settled) return;
     settled = true;
-    if(audioEl) audioEl.removeEventListener('ended', onEnded);
     clearTimeout(timer);
-  }
-  function advance(){
     if(token !== playToken) return;
-    cleanup();
     playSequence(idx+1, token);
   }
-  function onEnded(){ advance(); }
+  // 音声の読み込み・再生に失敗した場合は、長々待たせず短時間で次へ進む保険
+  function onLoadFailure(){
+    clearTimeout(timer);
+    timer = setTimeout(advance, 1200);
+  }
 
   if(slot){
-    audioEl = slot.el;
+    const audioEl = slot.el;
+    activeAudio = audioEl;
     audioEl.currentTime = 0;
-    audioEl.play().catch(()=>{});
-    audioEl.addEventListener('ended', onEnded);
+    audioEl.onended = advance;
+    audioEl.onerror = onLoadFailure;
+    let playPromise;
+    try{ playPromise = audioEl.play(); }catch(e){ playPromise = null; }
+    if(playPromise && playPromise.catch){ playPromise.catch(onLoadFailure); }
   }
 
   const barDuration = slot ? 6 : 4; // seconds, visual only
@@ -823,20 +1009,92 @@ function playSequence(idx, token){
     bar.style.width = '100%';
   });
 
-  // safety timeout in case audio "ended" never fires (or no BGM assigned)
+  // 通常の保険（"ended" が万一発火しない場合）。読み込み失敗時は上のonLoadFailureが
+  // より短い待ち時間に上書きする。
   timer = setTimeout(advance, slot ? 12000 : 4200);
 }
 
 function showEnd(){
+  stopActiveAudio();
   ovStage.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
     <div class="ov-end"><h3>おわり</h3><p>4つの場面が終わりました</p></div>
   </div>`;
   [...ovProgress.children].forEach(s=>s.classList.add('filled'));
 }
 
+/* ============================================================
+   保存データのリセット（別の授業・別のクラスで使う前に）
+   ============================================================ */
+async function resetAllMedia(){
+  const ok = window.confirm('保存されている写真とBGMをすべて消去します。よろしいですか？');
+  if(!ok) return;
+
+  await idbClearAll();
+
+  photos.forEach(p=>{ if(p){ try{ URL.revokeObjectURL(p.url); }catch(e){} } });
+  audioSlots.forEach(a=>{ if(a){ try{ a.el.pause(); }catch(e){} try{ URL.revokeObjectURL(a.url); }catch(e){} } });
+
+  photos = [null,null,null,null];
+  audioSlots = [null,null,null,null];
+  assign = [null,null,null,null];
+  current = 0;
+
+  for(let i=0;i<PANEL_COUNT;i++){
+    const ps = document.getElementById('photoSlot'+i);
+    ps.classList.remove('filled');
+    document.getElementById('thumb'+i).innerHTML = '<span class="ph-empty">🖼</span>';
+    document.getElementById('pstatus'+i).textContent = '未読み込み';
+    const pinput = ps.querySelector('input[type=file]');
+    if(pinput) pinput.value = '';
+
+    const as = document.getElementById('audioSlot'+i);
+    as.classList.remove('filled');
+    document.getElementById('astatus'+i).textContent = '未読み込み';
+    const ainput = as.querySelector('input[type=file]');
+    if(ainput) ainput.value = '';
+    const pbtn = as.querySelector('.preview');
+    if(pbtn) pbtn.disabled = true;
+  }
+  renderActivityView();
+}
+document.getElementById('resetMediaBtn').addEventListener('click', resetAllMedia);
+
+/* ============================================================
+   起動時：IndexedDBに保存済みの写真・BGMがあれば読み込む
+   ============================================================ */
+async function restoreFromDB(){
+  for(let i=0;i<PANEL_COUNT;i++){
+    const rec = await idbGet('photo'+i);
+    if(rec && rec.blob){
+      const url = URL.createObjectURL(rec.blob);
+      photos[i] = { url, name: rec.name };
+      const slotDiv = document.getElementById('photoSlot'+i);
+      slotDiv.classList.add('filled');
+      document.getElementById('thumb'+i).innerHTML = `<img src="${url}" alt="">`;
+      document.getElementById('pstatus'+i).textContent = rec.name;
+    }
+  }
+  for(let i=0;i<PANEL_COUNT;i++){
+    const rec = await idbGet('audio'+i);
+    if(rec && rec.blob){
+      const url = URL.createObjectURL(rec.blob);
+      const el = new Audio(url);
+      el.preload = 'auto';
+      audioSlots[i] = { url, name: rec.name, el };
+      const slotDiv = document.getElementById('audioSlot'+i);
+      slotDiv.classList.add('filled');
+      document.getElementById('astatus'+i).textContent = rec.name;
+      slotDiv.querySelector('.preview').disabled = false;
+    }
+  }
+}
+
 /* ---------- init ---------- */
-renderActivityView();
-showPrep();
+(async ()=>{
+  await restoreFromDB();
+  renderActivityView();
+  requestPrep();
+})();
 </script>
 </body>
 </html>
