@@ -741,6 +741,11 @@ audioSlotsEl.addEventListener('change', (e)=>{
   el.preload = 'auto';
   audioSlots[idx] = { url, name:file.name, blob:file, el };
   reflectAudioSlotUI(idx);
+  if(file.size > 2*1024*1024){
+    // 大きい音声ファイル(WAV/AIFFなど)は共有保存に時間がかかったり失敗しやすくなるため、軽く注意を促す
+    const statusEl = document.getElementById('astatus'+idx);
+    statusEl.textContent += `（${(file.size/1024/1024).toFixed(1)}MB・大きめです。mp3など軽い形式がおすすめです）`;
+  }
   renderActivityView(); // refresh bgm buttons enabled state (keeps existing assignments)
   idbPut('audio'+idx, { name:file.name, type:file.type, blob:file }); // persist for next reload
 });
@@ -1149,7 +1154,7 @@ const firebaseConfig = {
   appId: "1:407232588246:web:17c52f17bcf29bca165c77"
 };
 
-const CHUNK_SIZE = 700000;   // base64文字数の目安（Firestoreの1MiB上限に対して余裕を持たせる）
+const CHUNK_SIZE = 300000;   // base64文字数の目安（Firestoreの1MiB上限に対して余裕を持たせる）
 const MAX_IMAGE_DIM = 960;   // 送信前に縮小する写真の長辺の最大px
 const IMAGE_QUALITY = 0.72;  // JPEG圧縮の品質
 
@@ -1185,7 +1190,18 @@ async function initFirebase(){
       import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')
     ]);
     const app = initializeApp(firebaseConfig);
-    db = fsMod.getFirestore(app);
+    // 学校のネットワーク（プロキシ・フィルタリング機器など）ではFirestoreの
+    // 既定のストリーミング接続(WebChannel)がうまく動かず、まとまった量の書き込みで
+    // "Write stream exhausted maximum allowed queued writes" のように詰まることが
+    // ある。long polling方式に固定することで、そうした環境でも動作しやすくする。
+    try{
+      db = fsMod.initializeFirestore(app, {
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false
+      });
+    }catch(e){
+      db = fsMod.getFirestore(app); // 既にどこかで初期化済みなどの場合のフォールバック
+    }
     sessionDocRef = fsMod.doc(db, 'sessions', 'current');
     fbApi = fsMod;
     fbReady = true;
@@ -1286,21 +1302,51 @@ async function applySharedSnapshot(data){
   renderActivityView();
 }
 
+// Firestoreは「1ドキュメント1MiB」だけでなく「1回の書き込みリクエスト全体で
+// 約10MiB」という上限も持つ。写真・BGMの合計が大きいクラスでは、チャンクを
+// すべて1回のbatch.commit()にまとめると簡単にこれを超えてしまうため、
+// 個数・合計サイズの両方に安全マージンを持たせて複数のバッチに分けて送る。
+const MAX_BATCH_OPS = 20;                  // 1バッチあたりの操作数（小さめに抑え、書き込みストリームを詰まらせない）
+const MAX_BATCH_BYTES = 1 * 1024 * 1024;   // 1バッチあたりの合計データ量の上限（安全のためかなり小さめに）
+const BATCH_PAUSE_MS = 150;                // 各バッチの間に短い間隔を空け、書き込みストリームへの負荷を抑える
+
 async function deleteAllChunks(){
   const snap = await fbApi.getDocs(fbApi.collection(sessionDocRef, 'chunks'));
   if(snap.empty) return;
-  const batch = fbApi.writeBatch(db);
-  snap.forEach(d=> batch.delete(d.ref));
-  await batch.commit();
+  const refs = [];
+  snap.forEach(d=> refs.push(d.ref));
+  for(let i=0;i<refs.length;i+=MAX_BATCH_OPS){
+    const batch = fbApi.writeBatch(db);
+    refs.slice(i, i+MAX_BATCH_OPS).forEach(ref=> batch.delete(ref));
+    await batch.commit();
+    if(i+MAX_BATCH_OPS < refs.length) await new Promise(r=>setTimeout(r, BATCH_PAUSE_MS));
+  }
 }
 
 async function writeChunksInBatches(items){
   if(items.length === 0) return;
-  const batch = fbApi.writeBatch(db);
-  items.forEach(({id, data})=>{
-    batch.set(fbApi.doc(fbApi.collection(sessionDocRef, 'chunks'), id), { data });
-  });
-  await batch.commit();
+  let group = [];
+  let groupBytes = 0;
+  const flush = async ()=>{
+    if(group.length === 0) return;
+    const batch = fbApi.writeBatch(db);
+    group.forEach(({id, data})=>{
+      batch.set(fbApi.doc(fbApi.collection(sessionDocRef, 'chunks'), id), { data });
+    });
+    await batch.commit();
+    group = [];
+    groupBytes = 0;
+    await new Promise(r=>setTimeout(r, BATCH_PAUSE_MS));
+  };
+  for(const item of items){
+    const itemBytes = item.data.length; // base64はASCII文字なので文字数≒バイト数
+    if(group.length >= MAX_BATCH_OPS || (groupBytes + itemBytes) > MAX_BATCH_BYTES){
+      await flush();
+    }
+    group.push(item);
+    groupBytes += itemBytes;
+  }
+  await flush();
 }
 
 function blobToBase64(blob){
@@ -1357,7 +1403,7 @@ async function shareCurrentSetup(){
   const prevLabel = shareBtn.textContent;
   shareBtn.disabled = true;
   shareBtn.textContent = '保存中…';
-  shareStatus.textContent = '写真・BGMをクラウドに送信しています…';
+  shareStatus.textContent = '写真・BGMをクラウドに送信しています…（データ量や通信状況によっては1分程度かかることがあります）';
   try{
     // 1) 写真は送信前に圧縮、BGMはそのまま使う
     const prepared = {}; // key -> {name, type, blob} | null
@@ -1394,6 +1440,19 @@ async function shareCurrentSetup(){
       assign: assign,
       media: manifestMedia
     });
+
+    // ネットワーク状況によっては、ローカルキャッシュ上だけ書き込みが成功したように
+    // 見えて実際にはサーバーへ届いていない、ということが起こりうる。
+    // ここで明示的にサーバーから読み直して確認できるまでは「完了」と報告しない。
+    shareStatus.textContent = 'サーバーへの反映を確認しています…';
+    const verifyManifestSnap = await fbApi.getDocFromServer(sessionDocRef);
+    if(!verifyManifestSnap.exists()){
+      throw new Error('サーバーへの反映を確認できませんでした。通信状況を確認し、もう一度お試しください。');
+    }
+    const verifyChunksSnap = await fbApi.getDocsFromServer(fbApi.collection(sessionDocRef, 'chunks'));
+    if(verifyChunksSnap.size !== writeItems.length){
+      throw new Error(`サーバー上のデータ件数が一致しません（期待:${writeItems.length}件 / 実際:${verifyChunksSnap.size}件）。通信状況を確認し、もう一度お試しください。`);
+    }
 
     shareBtn.textContent = '共有しました ✓';
     shareStatus.textContent = 'クラウドへの保存が完了しました。児童の端末にも自動的に反映されます。';
