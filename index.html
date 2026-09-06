@@ -110,6 +110,8 @@
     gap:10px;
   }
   @media (max-width:560px){ .slots{ grid-template-columns:repeat(2,1fr); } }
+  /* BGMスロットは写真スロットと違い個数を変えられるので、自動で列数を調整する */
+  #audioSlots{ grid-template-columns:repeat(auto-fit, minmax(76px, 1fr)); }
   .slot{
     background:#181c30;
     border:1px solid var(--dusk-2);
@@ -241,7 +243,7 @@
   }
   .picker{
     display:grid;
-    grid-template-columns:repeat(4, 1fr);
+    grid-template-columns:repeat(auto-fit, minmax(58px, 1fr));
     gap:8px;
   }
   .bgm-btn{
@@ -501,8 +503,8 @@
     </div>
 
     <div class="panel">
-      <h2>BGMを4つよみこむ</h2>
-      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを4つ用意してください（A〜Dの並び順に意味はありません）。</p>
+      <h2>BGMを6つよみこむ</h2>
+      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを6つ用意してください（A〜Fの並び順に意味はありません）。</p>
       <div class="slots" id="audioSlots"></div>
       <div class="prep-cta-row" style="margin-top:14px;">
         <button class="ghost-btn" id="stopSoundBtnPrep">⏹ いま鳴っている音をとめる</button>
@@ -568,14 +570,15 @@
 
 <script>
 /* ---------- constants ---------- */
-const PANEL_COUNT = 4;
-const LETTERS = ["A","B","C","D"];
+const PANEL_COUNT = 4; // 場面（写真）の数
+const LETTERS = ["A","B","C","D","E","F"]; // BGMの選択肢
+const BGM_COUNT = LETTERS.length;
 const SLIDE_DURATION_MS = 5000; // 紙芝居再生：1コマにつき固定5秒で自動的に次へ
 
 /* ---------- state ---------- */
-let photos = [null,null,null,null];     // {url,name,blob}
-let audioSlots = [null,null,null,null]; // {url,name,blob,el}
-let assign = [null,null,null,null];     // letter assigned to each panel, or null
+let photos = [null,null,null,null];             // {url,name,blob}
+let audioSlots = new Array(BGM_COUNT).fill(null); // {url,name,blob,el}
+let assign = [null,null,null,null];             // letter assigned to each panel, or null
 let current = 0;          // current panel index in activity view
 let playToken = 0;
 let activeAudio = null;   // the <audio> currently sounding, from ANY source (preview or kamishibai)
@@ -1065,14 +1068,12 @@ function performLocalReset(){
   audioSlots.forEach(a=>{ if(a){ try{ a.el.pause(); }catch(e){} try{ URL.revokeObjectURL(a.url); }catch(e){} } });
 
   photos = [null,null,null,null];
-  audioSlots = [null,null,null,null];
+  audioSlots = new Array(BGM_COUNT).fill(null);
   assign = [null,null,null,null];
   current = 0;
 
-  for(let i=0;i<PANEL_COUNT;i++){
-    reflectPhotoSlotUI(i);
-    reflectAudioSlotUI(i);
-  }
+  for(let i=0;i<PANEL_COUNT;i++) reflectPhotoSlotUI(i);
+  for(let i=0;i<BGM_COUNT;i++) reflectAudioSlotUI(i);
   renderActivityView();
 }
 
@@ -1111,7 +1112,7 @@ async function restoreFromDB(){
       reflectPhotoSlotUI(i);
     }
   }
-  for(let i=0;i<PANEL_COUNT;i++){
+  for(let i=0;i<BGM_COUNT;i++){
     const rec = await idbGet('audio'+i);
     if(rec && rec.blob){
       const url = URL.createObjectURL(rec.blob);
@@ -1253,7 +1254,7 @@ async function applySharedSnapshot(data){
     reflectPhotoSlotUI(i);
   }
 
-  for(let i=0;i<PANEL_COUNT;i++){
+  for(let i=0;i<BGM_COUNT;i++){
     const key = 'audio'+i;
     const meta = media[key];
     if(meta && chunkMap[key]){
@@ -1366,7 +1367,7 @@ async function shareCurrentSetup(){
         ? { name: photos[i].name, type: 'image/jpeg', blob: await compressImageBlob(photos[i].blob) }
         : null;
     }
-    for(let i=0;i<PANEL_COUNT;i++){
+    for(let i=0;i<BGM_COUNT;i++){
       const key = 'audio'+i;
       prepared[key] = (audioSlots[i] && audioSlots[i].blob)
         ? { name: audioSlots[i].name, type: audioSlots[i].blob.type || 'audio/mpeg', blob: audioSlots[i].blob }
