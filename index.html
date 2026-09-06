@@ -176,7 +176,9 @@
   .toolbar{
     display:flex;
     justify-content:center;
+    gap:10px;
     margin-bottom:14px;
+    flex-wrap:wrap;
   }
 
   .stage-wrap{ position:relative; }
@@ -342,6 +344,7 @@
   .ghost-btn:hover{ border-color:var(--gold); color:var(--gold-soft); }
   .ghost-btn.danger{ border-color:var(--ember-deep); color:#f0b39a; }
   .ghost-btn.danger:hover{ border-color:var(--ember); color:#ffd0bd; }
+  .ghost-btn:disabled{ opacity:.4; cursor:not-allowed; }
 
   /* ---- password gate (teacher) ---- */
   .pw-card{
@@ -441,6 +444,8 @@
     margin-top:18px;
     display:flex;
     gap:12px;
+    flex-wrap:wrap;
+    justify-content:center;
   }
   .ov-btn{
     background:#232946;
@@ -497,13 +502,25 @@
 
     <div class="panel">
       <h2>BGMを4つよみこむ</h2>
-      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを4つ用意してください（A〜Dの並び順に意味はありません）。音声はブラウザ内だけで使われます。</p>
+      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを4つ用意してください（A〜Dの並び順に意味はありません）。</p>
       <div class="slots" id="audioSlots"></div>
+      <div class="prep-cta-row" style="margin-top:14px;">
+        <button class="ghost-btn" id="stopSoundBtnPrep">⏹ いま鳴っている音をとめる</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>この授業の設定をみんなに共有する</h2>
+      <p class="panel-note">保存を押すと、写真・BGM・場面ごとの割り当てが「今の授業の設定」としてクラウドに保存され、同じURLを開いた児童全員の画面に自動的に反映されます（通信環境が必要です）。</p>
+      <div class="prep-cta-row">
+        <button class="cta" id="shareBtn" disabled>この内容をきょうの設定として保存する</button>
+      </div>
+      <p class="cta-sub" id="shareStatus">共有機能を準備しています…</p>
     </div>
 
     <div class="panel">
       <h2>保存データについて</h2>
-      <p class="panel-note">アップロードした写真とBGMは、この端末のブラウザ内だけに保存され、次に開いたときも自動で読み込まれます（リポジトリやサーバーには送られません）。別の授業・別のクラスで使う前は、下のボタンで一度消去してください。</p>
+      <p class="panel-note">アップロードした写真とBGMは、この端末のブラウザ内（IndexedDB）と、共有保存した場合はクラウドの両方に保存されます（音声・写真ファイル自体がリポジトリにコミットされることはありません）。別の授業・別のクラスで使う前は、下のボタンでこの端末とクラウドの両方から消去してください。</p>
       <div class="prep-cta-row">
         <button class="ghost-btn danger" id="resetMediaBtn">保存した写真・BGMをすべて消す</button>
       </div>
@@ -518,6 +535,7 @@
   <section id="activityView" hidden>
     <div class="toolbar">
       <button class="ghost-btn" id="backPrepBtn">← じゅんび画面にもどる</button>
+      <button class="ghost-btn" id="stopSoundBtnActivity">⏹ 音をとめる</button>
     </div>
 
     <div class="stage-wrap">
@@ -541,8 +559,9 @@
   <div class="ov-stage" id="ovStage"></div>
   <div class="ov-progress" id="ovProgress"></div>
   <div class="ov-controls">
-    <button class="ov-btn" id="ovClose">とじる</button>
+    <button class="ov-btn" id="ovStop">⏹ 音をとめる</button>
     <button class="ov-btn" id="ovNext">つぎへ</button>
+    <button class="ov-btn" id="ovClose">とじる</button>
     <button class="ov-btn" id="ovReplay">もう一度さいせい</button>
   </div>
 </div>
@@ -551,20 +570,21 @@
 /* ---------- constants ---------- */
 const PANEL_COUNT = 4;
 const LETTERS = ["A","B","C","D"];
+const SLIDE_DURATION_MS = 5000; // 紙芝居再生：1コマにつき固定5秒で自動的に次へ
 
 /* ---------- state ---------- */
-let photos = [null,null,null,null];     // {url,name}
-let audioSlots = [null,null,null,null]; // {url,name,el}
+let photos = [null,null,null,null];     // {url,name,blob}
+let audioSlots = [null,null,null,null]; // {url,name,blob,el}
 let assign = [null,null,null,null];     // letter assigned to each panel, or null
 let current = 0;          // current panel index in activity view
-let currentPreview = null;
 let playToken = 0;
-let activeAudio = null;   // the <audio> currently playing as part of kamishibai auto-playback
+let activeAudio = null;   // the <audio> currently sounding, from ANY source (preview or kamishibai)
 
 /* ============================================================
    ブラウザ内保存（IndexedDB）
    写真・BGMは著作権上の理由でリポジトリにはコミットしない。
-   保存先はこの端末のブラウザだけ（IndexedDB）にとどめる。
+   この端末のブラウザだけに保存する、あるいは後述のFirebase経由で
+   共有された内容をこの端末にもキャッシュしておく用途に使う。
    ============================================================ */
 const IDB_NAME = 'bgm-kamishibai';
 const IDB_VERSION = 1;
@@ -625,6 +645,40 @@ function photoBoxHTML(idx, emptyIcon){
   return `<div class="ph-empty"><span class="icon">${emptyIcon||'🖼'}</span>写真じゅんび中</div>`;
 }
 
+// 準備画面の写真スロットのDOM表示を、現在のphotos[i]に合わせて更新する
+function reflectPhotoSlotUI(i){
+  const ps = document.getElementById('photoSlot'+i);
+  if(!ps) return;
+  if(photos[i]){
+    ps.classList.add('filled');
+    document.getElementById('thumb'+i).innerHTML = `<img src="${photos[i].url}" alt="">`;
+    document.getElementById('pstatus'+i).textContent = photos[i].name;
+  } else {
+    ps.classList.remove('filled');
+    document.getElementById('thumb'+i).innerHTML = '<span class="ph-empty">🖼</span>';
+    document.getElementById('pstatus'+i).textContent = '未読み込み';
+    const input = ps.querySelector('input[type=file]');
+    if(input) input.value = '';
+  }
+}
+// 準備画面のBGMスロットのDOM表示を、現在のaudioSlots[i]に合わせて更新する
+function reflectAudioSlotUI(i){
+  const as = document.getElementById('audioSlot'+i);
+  if(!as) return;
+  const pbtn = as.querySelector('.preview');
+  if(audioSlots[i]){
+    as.classList.add('filled');
+    document.getElementById('astatus'+i).textContent = audioSlots[i].name;
+    if(pbtn) pbtn.disabled = false;
+  } else {
+    as.classList.remove('filled');
+    document.getElementById('astatus'+i).textContent = '未読み込み';
+    if(pbtn) pbtn.disabled = true;
+    const input = as.querySelector('input[type=file]');
+    if(input) input.value = '';
+  }
+}
+
 /* ============================================================
    準備画面：写真スロット
    ============================================================ */
@@ -649,11 +703,8 @@ photoSlotsEl.addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
   const url = URL.createObjectURL(file);
-  photos[idx] = { url, name:file.name };
-  const slotDiv = document.getElementById('photoSlot'+idx);
-  slotDiv.classList.add('filled');
-  document.getElementById('thumb'+idx).innerHTML = `<img src="${url}" alt="">`;
-  document.getElementById('pstatus'+idx).textContent = file.name;
+  photos[idx] = { url, name:file.name, blob:file };
+  reflectPhotoSlotUI(idx);
   renderActivityView(); // keep activity view in sync
   idbPut('photo'+idx, { name:file.name, type:file.type, blob:file }); // persist for next reload
 });
@@ -685,12 +736,8 @@ audioSlotsEl.addEventListener('change', (e)=>{
   if(audioSlots[idx] && audioSlots[idx].el){ audioSlots[idx].el.pause(); }
   const el = new Audio(url);
   el.preload = 'auto';
-  audioSlots[idx] = { url, name:file.name, el };
-  const slotDiv = document.getElementById('audioSlot'+idx);
-  slotDiv.classList.add('filled');
-  document.getElementById('astatus'+idx).textContent = file.name;
-  const pbtn = slotDiv.querySelector('.preview');
-  pbtn.disabled = false;
+  audioSlots[idx] = { url, name:file.name, blob:file, el };
+  reflectAudioSlotUI(idx);
   renderActivityView(); // refresh bgm buttons enabled state (keeps existing assignments)
   idbPut('audio'+idx, { name:file.name, type:file.type, blob:file }); // persist for next reload
 });
@@ -699,14 +746,31 @@ audioSlotsEl.addEventListener('click', (e)=>{
   if(!btn || btn.disabled) return;
   playPreview(+btn.dataset.idx);
 });
+
+/* ============================================================
+   音声再生の一本化：試聴中でも紙芝居再生中でも、
+   「いま鳴っている音」はこの1つの変数・1つの停止関数で管理する。
+   ============================================================ */
+function stopActiveAudio(){
+  if(activeAudio){
+    activeAudio.onended = null;
+    activeAudio.onerror = null;
+    activeAudio.pause();
+    try{ activeAudio.currentTime = 0; }catch(e){}
+    activeAudio = null;
+  }
+}
 function playPreview(idx){
   if(!audioSlots[idx]) return;
-  if(currentPreview){ currentPreview.pause(); currentPreview.currentTime = 0; }
+  stopActiveAudio(); // 前の音を必ず止めてから次を鳴らす
   const el = audioSlots[idx].el;
   el.currentTime = 0;
+  activeAudio = el;
   el.play().catch(()=>{});
-  currentPreview = el;
 }
+document.getElementById('stopSoundBtnPrep').addEventListener('click', stopActiveAudio);
+document.getElementById('stopSoundBtnActivity').addEventListener('click', stopActiveAudio);
+document.getElementById('ovStop').addEventListener('click', stopActiveAudio);
 
 /* ============================================================
    モード切り替え（準備 ⇔ 活動）＋ 先生用パスワードゲート
@@ -748,7 +812,7 @@ function showPasswordGate(){
   tabActivity.classList.remove('active');
   pwError.hidden = true;
   pwInput.value = '';
-  if(currentPreview){ currentPreview.pause(); }
+  stopActiveAudio();
   setTimeout(()=> pwInput.focus(), 50);
 }
 function submitPassword(){
@@ -770,7 +834,7 @@ function showPrep(){
   activityView.hidden = true;
   tabPrep.classList.add('active');
   tabActivity.classList.remove('active');
-  if(currentPreview){ currentPreview.pause(); }
+  stopActiveAudio();
 }
 function showActivity(){
   renderActivityView();
@@ -779,7 +843,7 @@ function showActivity(){
   activityView.hidden = false;
   tabPrep.classList.remove('active');
   tabActivity.classList.add('active');
-  if(currentPreview){ currentPreview.pause(); }
+  stopActiveAudio();
 }
 tabPrep.addEventListener('click', requestPrep);
 tabActivity.addEventListener('click', showActivity);
@@ -790,7 +854,6 @@ document.getElementById('backPrepBtn').addEventListener('click', requestPrep);
    活動画面：4コマカード
    ============================================================ */
 const cardHost = document.getElementById('cardHost');
-let activityBuilt = false;
 
 function renderActivityView(){
   cardHost.innerHTML = '';
@@ -886,7 +949,7 @@ function updateCta(){
 }
 
 /* ============================================================
-   再生（紙芝居アニメ）
+   再生（紙芝居アニメ）：1コマにつき固定5秒で自動的に次へ進む
    ============================================================ */
 const overlay = document.getElementById('overlay');
 const ovStage = document.getElementById('ovStage');
@@ -901,23 +964,10 @@ document.getElementById('ovNext').addEventListener('click', ()=>{
 });
 let manualNextIdx = 0;
 
-// 直前のコマのBGMが鳴りっぱなしにならないよう、次のコマに進む・途中で閉じる・
-// もう一度再生する、どの経路でも必ずここを通してから次の音を鳴らす。
-function stopActiveAudio(){
-  if(activeAudio){
-    activeAudio.onended = null;
-    activeAudio.onerror = null;
-    activeAudio.pause();
-    try{ activeAudio.currentTime = 0; }catch(e){}
-    activeAudio = null;
-  }
-}
-
 function closeOverlay(){
-  playToken++; // invalidate any running sequence
+  playToken++; // invalidate any running sequence/timer
   overlay.classList.remove('show');
   stopActiveAudio();
-  if(currentPreview){ currentPreview.pause(); }
 }
 
 function unlockAllAudio(){
@@ -975,43 +1025,27 @@ function playSequence(idx, token){
   const letterIdx = letter ? LETTERS.indexOf(letter) : -1;
   const slot = letterIdx>=0 ? audioSlots[letterIdx] : null;
 
-  let settled = false;
-  let timer = null;
-
-  function advance(){
-    if(settled) return;
-    settled = true;
-    clearTimeout(timer);
-    if(token !== playToken) return;
-    playSequence(idx+1, token);
-  }
-  // 音声の読み込み・再生に失敗した場合は、長々待たせず短時間で次へ進む保険
-  function onLoadFailure(){
-    clearTimeout(timer);
-    timer = setTimeout(advance, 1200);
-  }
-
   if(slot){
     const audioEl = slot.el;
     activeAudio = audioEl;
     audioEl.currentTime = 0;
-    audioEl.onended = advance;
-    audioEl.onerror = onLoadFailure;
     let playPromise;
     try{ playPromise = audioEl.play(); }catch(e){ playPromise = null; }
-    if(playPromise && playPromise.catch){ playPromise.catch(onLoadFailure); }
+    // 音声の読み込み・再生に失敗しても、下の固定タイマーで必ず次に進む
+    if(playPromise && playPromise.catch){ playPromise.catch(()=>{}); }
   }
 
-  const barDuration = slot ? 6 : 4; // seconds, visual only
   requestAnimationFrame(()=>{
     const bar = segs[idx].querySelector('i');
-    bar.style.transition = `width ${barDuration}s linear`;
+    bar.style.transition = `width ${SLIDE_DURATION_MS/1000}s linear`;
     bar.style.width = '100%';
   });
 
-  // 通常の保険（"ended" が万一発火しない場合）。読み込み失敗時は上のonLoadFailureが
-  // より短い待ち時間に上書きする。
-  timer = setTimeout(advance, slot ? 12000 : 4200);
+  // 音声の長さに関わらず、1コマ5秒固定で次のコマ＋次のBGMに切り替える
+  setTimeout(()=>{
+    if(token !== playToken) return;
+    playSequence(idx+1, token);
+  }, SLIDE_DURATION_MS);
 }
 
 function showEnd(){
@@ -1024,13 +1058,9 @@ function showEnd(){
 
 /* ============================================================
    保存データのリセット（別の授業・別のクラスで使う前に）
+   ローカル（この端末のIndexedDB）とクラウド（Firebase）の両方を消す。
    ============================================================ */
-async function resetAllMedia(){
-  const ok = window.confirm('保存されている写真とBGMをすべて消去します。よろしいですか？');
-  if(!ok) return;
-
-  await idbClearAll();
-
+function performLocalReset(){
   photos.forEach(p=>{ if(p){ try{ URL.revokeObjectURL(p.url); }catch(e){} } });
   audioSlots.forEach(a=>{ if(a){ try{ a.el.pause(); }catch(e){} try{ URL.revokeObjectURL(a.url); }catch(e){} } });
 
@@ -1040,38 +1070,45 @@ async function resetAllMedia(){
   current = 0;
 
   for(let i=0;i<PANEL_COUNT;i++){
-    const ps = document.getElementById('photoSlot'+i);
-    ps.classList.remove('filled');
-    document.getElementById('thumb'+i).innerHTML = '<span class="ph-empty">🖼</span>';
-    document.getElementById('pstatus'+i).textContent = '未読み込み';
-    const pinput = ps.querySelector('input[type=file]');
-    if(pinput) pinput.value = '';
-
-    const as = document.getElementById('audioSlot'+i);
-    as.classList.remove('filled');
-    document.getElementById('astatus'+i).textContent = '未読み込み';
-    const ainput = as.querySelector('input[type=file]');
-    if(ainput) ainput.value = '';
-    const pbtn = as.querySelector('.preview');
-    if(pbtn) pbtn.disabled = true;
+    reflectPhotoSlotUI(i);
+    reflectAudioSlotUI(i);
   }
   renderActivityView();
+}
+
+async function resetAllMedia(){
+  const msg = fbReady
+    ? '保存されている写真とBGMを、この端末とクラウドの両方から消去します。よろしいですか？'
+    : '保存されている写真とBGMをこの端末から消去します。よろしいですか？';
+  const ok = window.confirm(msg);
+  if(!ok) return;
+
+  await idbClearAll();
+  performLocalReset();
+
+  if(fbReady){
+    try{
+      await deleteAllChunks();
+      await fbApi.deleteDoc(sessionDocRef);
+    }catch(err){
+      console.warn('クラウド側のデータ消去に失敗しました', err);
+      alert('この端末のデータは消去しましたが、クラウド側の消去に失敗しました。通信状況を確認してもう一度お試しください。');
+    }
+  }
 }
 document.getElementById('resetMediaBtn').addEventListener('click', resetAllMedia);
 
 /* ============================================================
    起動時：IndexedDBに保存済みの写真・BGMがあれば読み込む
+   （Firebaseから共有データが届いた場合は、その内容で上書きされる）
    ============================================================ */
 async function restoreFromDB(){
   for(let i=0;i<PANEL_COUNT;i++){
     const rec = await idbGet('photo'+i);
     if(rec && rec.blob){
       const url = URL.createObjectURL(rec.blob);
-      photos[i] = { url, name: rec.name };
-      const slotDiv = document.getElementById('photoSlot'+i);
-      slotDiv.classList.add('filled');
-      document.getElementById('thumb'+i).innerHTML = `<img src="${url}" alt="">`;
-      document.getElementById('pstatus'+i).textContent = rec.name;
+      photos[i] = { url, name: rec.name, blob: rec.blob };
+      reflectPhotoSlotUI(i);
     }
   }
   for(let i=0;i<PANEL_COUNT;i++){
@@ -1080,20 +1117,305 @@ async function restoreFromDB(){
       const url = URL.createObjectURL(rec.blob);
       const el = new Audio(url);
       el.preload = 'auto';
-      audioSlots[i] = { url, name: rec.name, el };
-      const slotDiv = document.getElementById('audioSlot'+i);
-      slotDiv.classList.add('filled');
-      document.getElementById('astatus'+i).textContent = rec.name;
-      slotDiv.querySelector('.preview').disabled = false;
+      audioSlots[i] = { url, name: rec.name, blob: rec.blob, el };
+      reflectAudioSlotUI(i);
     }
   }
 }
+
+/* ============================================================
+   Firebase（Firestore）による共有保存
+   ------------------------------------------------------------
+   ・写真／BGMは無料枠（Sparkプラン・クレジットカード登録不要）に
+     収めるため、Cloud Storageは使わずFirestoreのドキュメントに
+     base64で分割保存する（1ドキュメント上限1MiBのため）。
+   ・写真は送信前にcanvasで長辺960pxまで縮小＋JPEG圧縮してから送る。
+   ・sessions/current が「今の授業の設定」を表すドキュメント、
+     sessions/current/chunks の中に写真・音声の実データを分割保存する。
+   ・fetch自体（Firebase SDKの読み込み）に失敗しても、それが原因で
+     アプリ全体が壊れないように、動的import + try/catchで隔離する。
+   ============================================================ */
+
+// ↓ ここにFirebaseコンソールで作成したWebアプリの設定値を貼り付けてください。
+// これらは秘密情報ではなく（Firestoreのアクセス制御はセキュリティルール側で行うため）、
+// 公開リポジトリに含めて問題ありません。
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY_HERE",
+  authDomain: "PASTE_YOUR_AUTH_DOMAIN_HERE",
+  projectId: "PASTE_YOUR_PROJECT_ID_HERE",
+  storageBucket: "PASTE_YOUR_STORAGE_BUCKET_HERE",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID_HERE",
+  appId: "PASTE_YOUR_APP_ID_HERE"
+};
+
+const CHUNK_SIZE = 700000;   // base64文字数の目安（Firestoreの1MiB上限に対して余裕を持たせる）
+const MAX_IMAGE_DIM = 960;   // 送信前に縮小する写真の長辺の最大px
+const IMAGE_QUALITY = 0.72;  // JPEG圧縮の品質
+
+let fbReady = false;
+let fbApi = null;          // firebase-firestoreモジュールの名前空間（動的importで取得）
+let db = null;
+let sessionDocRef = null;
+let hadSharedSession = false;
+let lastAppliedUpdatedAtMs = null;
+
+const shareBtn = document.getElementById('shareBtn');
+const shareStatus = document.getElementById('shareStatus');
+
+function reflectShareUI(){
+  if(fbReady){
+    shareBtn.disabled = false;
+    shareStatus.textContent = 'この端末から保存すると、同じURLを開いた児童全員に自動的に反映されます。';
+  } else {
+    shareBtn.disabled = true;
+    shareStatus.textContent = '共有機能は準備中です（Firebaseの設定が必要です）。ローカル保存のみで動作します。';
+  }
+}
+reflectShareUI();
+
+async function initFirebase(){
+  if(!firebaseConfig.apiKey || firebaseConfig.apiKey.indexOf('PASTE_') === 0){
+    console.info('Firebase未設定のため、共有機能はオフのまま動作します。');
+    return; // 設定前でもアプリ本体（ローカル保存・再生）は問題なく動く
+  }
+  try{
+    const [{ initializeApp }, fsMod] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')
+    ]);
+    const app = initializeApp(firebaseConfig);
+    db = fsMod.getFirestore(app);
+    sessionDocRef = fsMod.doc(db, 'sessions', 'current');
+    fbApi = fsMod;
+    fbReady = true;
+    reflectShareUI();
+    subscribeSharedSession();
+  }catch(err){
+    // 通信環境がない教室でもアプリ本体が壊れないよう、ここで確実に握りつぶす
+    console.warn('Firebaseの読み込みに失敗しました。共有機能なしで動作します。', err);
+  }
+}
+
+function subscribeSharedSession(){
+  fbApi.onSnapshot(sessionDocRef, async (snap)=>{
+    if(!snap.exists()){
+      if(hadSharedSession){
+        // クラウド側が(リセットなどで)消えた → この端末の表示もあわせて空にする
+        performLocalReset();
+        await idbClearAll();
+      }
+      return;
+    }
+    hadSharedSession = true;
+    const data = snap.data();
+    const updatedAtMs = (data.updatedAt && data.updatedAt.toMillis) ? data.updatedAt.toMillis() : Date.now();
+    if(lastAppliedUpdatedAtMs !== null && updatedAtMs === lastAppliedUpdatedAtMs) return;
+    lastAppliedUpdatedAtMs = updatedAtMs;
+    try{
+      await applySharedSnapshot(data);
+    }catch(err){
+      console.warn('共有データの読み込みに失敗しました', err);
+    }
+  }, (err)=>{
+    console.warn('共有データの購読に失敗しました', err);
+  });
+}
+
+async function applySharedSnapshot(data){
+  const chunksSnap = await fbApi.getDocs(fbApi.collection(sessionDocRef, 'chunks'));
+  const chunkMap = {}; // key -> [base64chunk0, base64chunk1, ...]
+  chunksSnap.forEach(d=>{
+    const m = d.id.match(/^(.+)_(\d+)$/);
+    if(!m) return;
+    const key = m[1], ci = +m[2];
+    if(!chunkMap[key]) chunkMap[key] = [];
+    chunkMap[key][ci] = d.data().data;
+  });
+
+  stopActiveAudio(); // これから中身を丸ごと差し替えるので、鳴っている音は止めておく
+
+  const media = data.media || {};
+
+  for(let i=0;i<PANEL_COUNT;i++){
+    const key = 'photo'+i;
+    const meta = media[key];
+    if(meta && chunkMap[key]){
+      const base64 = chunkMap[key].join('');
+      const blob = base64ToBlob(base64, meta.type || 'image/jpeg');
+      if(photos[i]) try{ URL.revokeObjectURL(photos[i].url); }catch(e){}
+      const url = URL.createObjectURL(blob);
+      photos[i] = { url, name: meta.name, blob };
+      idbPut('photo'+i, { name: meta.name, type: meta.type, blob });
+    } else if(!meta){
+      if(photos[i]) try{ URL.revokeObjectURL(photos[i].url); }catch(e){}
+      photos[i] = null;
+    }
+    reflectPhotoSlotUI(i);
+  }
+
+  for(let i=0;i<PANEL_COUNT;i++){
+    const key = 'audio'+i;
+    const meta = media[key];
+    if(meta && chunkMap[key]){
+      const base64 = chunkMap[key].join('');
+      const blob = base64ToBlob(base64, meta.type || 'audio/mpeg');
+      if(audioSlots[i]){ try{ audioSlots[i].el.pause(); }catch(e){} try{ URL.revokeObjectURL(audioSlots[i].url); }catch(e){} }
+      const url = URL.createObjectURL(blob);
+      const el = new Audio(url);
+      el.preload = 'auto';
+      audioSlots[i] = { url, name: meta.name, blob, el };
+      idbPut('audio'+i, { name: meta.name, type: meta.type, blob });
+    } else if(!meta){
+      if(audioSlots[i]){ try{ audioSlots[i].el.pause(); }catch(e){} }
+      audioSlots[i] = null;
+    }
+    reflectAudioSlotUI(i);
+  }
+
+  // 場面ごとの割り当ては「教員が設定した初期状態」として受け取る。
+  // ただしこの端末で児童がすでに何か選び始めている場合は、その選択を
+  // 上書きしない（写真・BGMの差し替えだけ反映する）。
+  const sharedAssign = Array.isArray(data.assign) ? data.assign.slice(0, PANEL_COUNT) : [];
+  while(sharedAssign.length < PANEL_COUNT) sharedAssign.push(null);
+  const localUntouched = assign.every(a=>!a);
+  if(localUntouched){
+    assign = sharedAssign;
+  }
+
+  renderActivityView();
+}
+
+async function deleteAllChunks(){
+  const snap = await fbApi.getDocs(fbApi.collection(sessionDocRef, 'chunks'));
+  if(snap.empty) return;
+  const batch = fbApi.writeBatch(db);
+  snap.forEach(d=> batch.delete(d.ref));
+  await batch.commit();
+}
+
+async function writeChunksInBatches(items){
+  if(items.length === 0) return;
+  const batch = fbApi.writeBatch(db);
+  items.forEach(({id, data})=>{
+    batch.set(fbApi.doc(fbApi.collection(sessionDocRef, 'chunks'), id), { data });
+  });
+  await batch.commit();
+}
+
+function blobToBase64(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = ()=> reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+function base64ToBlob(base64, type){
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+function splitIntoChunks(str, size){
+  const out = [];
+  for(let i=0;i<str.length;i+=size) out.push(str.slice(i, i+size));
+  return out.length ? out : [''];
+}
+function compressImageBlob(blob){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = ()=>{
+      let { width, height } = img;
+      if(width >= height && width > MAX_IMAGE_DIM){
+        height = Math.round(height * MAX_IMAGE_DIM / width);
+        width = MAX_IMAGE_DIM;
+      } else if(height > width && height > MAX_IMAGE_DIM){
+        width = Math.round(width * MAX_IMAGE_DIM / height);
+        height = MAX_IMAGE_DIM;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((outBlob)=>{
+        if(outBlob) resolve(outBlob); else reject(new Error('画像の圧縮に失敗しました'));
+      }, 'image/jpeg', IMAGE_QUALITY);
+    };
+    img.onerror = (e)=>{ URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+async function shareCurrentSetup(){
+  if(!fbReady){
+    alert('共有機能がまだ準備できていません（Firebaseの設定が必要です）。');
+    return;
+  }
+  const prevLabel = shareBtn.textContent;
+  shareBtn.disabled = true;
+  shareBtn.textContent = '保存中…';
+  shareStatus.textContent = '写真・BGMをクラウドに送信しています…';
+  try{
+    // 1) 写真は送信前に圧縮、BGMはそのまま使う
+    const prepared = {}; // key -> {name, type, blob} | null
+    for(let i=0;i<PANEL_COUNT;i++){
+      const key = 'photo'+i;
+      prepared[key] = (photos[i] && photos[i].blob)
+        ? { name: photos[i].name, type: 'image/jpeg', blob: await compressImageBlob(photos[i].blob) }
+        : null;
+    }
+    for(let i=0;i<PANEL_COUNT;i++){
+      const key = 'audio'+i;
+      prepared[key] = (audioSlots[i] && audioSlots[i].blob)
+        ? { name: audioSlots[i].name, type: audioSlots[i].blob.type || 'audio/mpeg', blob: audioSlots[i].blob }
+        : null;
+    }
+
+    // 2) 前回分のチャンクを消してから、新しいチャンクを書き込む
+    await deleteAllChunks();
+
+    const manifestMedia = {};
+    const writeItems = [];
+    for(const key of Object.keys(prepared)){
+      const m = prepared[key];
+      if(!m){ manifestMedia[key] = null; continue; }
+      const base64 = await blobToBase64(m.blob);
+      const chunks = splitIntoChunks(base64, CHUNK_SIZE);
+      chunks.forEach((chunkStr, ci)=> writeItems.push({ id: `${key}_${ci}`, data: chunkStr }));
+      manifestMedia[key] = { name: m.name, type: m.type, size: m.blob.size, chunks: chunks.length };
+    }
+    await writeChunksInBatches(writeItems);
+
+    await fbApi.setDoc(sessionDocRef, {
+      updatedAt: fbApi.serverTimestamp(),
+      assign: assign,
+      media: manifestMedia
+    });
+
+    shareBtn.textContent = '共有しました ✓';
+    shareStatus.textContent = 'クラウドへの保存が完了しました。児童の端末にも自動的に反映されます。';
+  }catch(err){
+    console.error('共有保存に失敗しました', err);
+    shareBtn.textContent = prevLabel;
+    shareStatus.textContent = '共有保存に失敗しました。通信状況を確認してもう一度お試しください。';
+    alert('共有保存に失敗しました。通信状況を確認してもう一度お試しください。\n(' + err.message + ')');
+  }finally{
+    setTimeout(()=>{
+      shareBtn.disabled = !fbReady;
+      shareBtn.textContent = prevLabel;
+    }, 2500);
+  }
+}
+shareBtn.addEventListener('click', shareCurrentSetup);
 
 /* ---------- init ---------- */
 (async ()=>{
   await restoreFromDB();
   renderActivityView();
   requestPrep();
+  initFirebase(); // 失敗しても上のローカル動作には影響しない（詳細はinitFirebase内のtry/catch参照）
 })();
 </script>
 </body>
