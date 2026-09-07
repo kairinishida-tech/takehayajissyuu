@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
-<title>BGM紙芝居アプリ</title>
+<title>推しキャラえらびアプリ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -110,8 +110,8 @@
     gap:10px;
   }
   @media (max-width:560px){ .slots{ grid-template-columns:repeat(2,1fr); } }
-  /* BGMスロットは写真スロットと違い個数を変えられるので、自動で列数を調整する */
-  #audioSlots{ grid-template-columns:repeat(auto-fit, minmax(76px, 1fr)); }
+  /* キャラスロットは写真スロットと違い個数を変えられるので、自動で列数を調整する */
+  #charSlots{ grid-template-columns:repeat(auto-fit, minmax(76px, 1fr)); }
   .slot{
     background:#181c30;
     border:1px solid var(--dusk-2);
@@ -145,18 +145,6 @@
   }
   .slot label.upload:hover{ background:var(--dusk-2); }
   .slot input[type=file]{ display:none; }
-  .slot button.preview{
-    margin-top:6px;
-    width:100%;
-    background:transparent;
-    border:1px solid var(--reed);
-    color:#bcd6c2;
-    border-radius:6px;
-    padding:5px 4px;
-    font-size:.75rem;
-    cursor:pointer;
-  }
-  .slot button.preview:disabled{ opacity:.35; cursor:not-allowed; }
 
   .thumb{
     width:100%;
@@ -174,13 +162,43 @@
 
   .prep-cta-row{ text-align:center; margin-top:6px; }
 
-  /* ---- activity view (kamishibai) ---- */
+  /* ---- activity view ---- */
   .toolbar{
     display:flex;
     justify-content:center;
     gap:10px;
     margin-bottom:14px;
     flex-wrap:wrap;
+  }
+
+  /* 名前入力ゲート */
+  .name-card{
+    background:#20253e;
+    border:1px solid var(--dusk-2);
+    border-radius:14px;
+    padding:32px 24px;
+    max-width:340px;
+    margin:40px auto 0;
+    text-align:center;
+  }
+  .name-card h2{
+    font-family:"Shippori Mincho", serif;
+    font-size:1.05rem;
+    color:var(--gold-soft);
+    margin:0 0 8px;
+    font-weight:700;
+  }
+  .name-card .panel-note{ margin:0 0 18px; }
+  .text-input{
+    width:100%;
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    font-size:1rem;
+    padding:10px 14px;
+    border-radius:8px;
+    border:1px solid var(--dusk-2);
+    background:#181c30;
+    color:#e4e8f5;
+    text-align:center;
   }
 
   .stage-wrap{ position:relative; }
@@ -243,36 +261,43 @@
   }
   .picker{
     display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(58px, 1fr));
+    grid-template-columns:repeat(auto-fit, minmax(64px, 1fr));
     gap:8px;
   }
-  .bgm-btn{
+  .char-btn{
     position:relative;
     background:#fff;
     border:2px solid var(--line);
     border-radius:10px;
-    padding:10px 4px 8px;
+    padding:6px 4px 6px;
     text-align:center;
     cursor:pointer;
     font-family:"Zen Kaku Gothic New", sans-serif;
     transition:border-color .12s, background .12s;
   }
-  .bgm-btn .bl{
+  .char-thumb{
+    width:100%;
+    aspect-ratio:1/1;
+    border-radius:8px;
+    overflow:hidden;
+    background:#f1ead4;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:4px;
+  }
+  .char-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .char-thumb .char-empty{ color:#b6ac8e; font-size:1.3rem; }
+  .char-btn .bl{
     font-family:"Shippori Mincho", serif;
-    font-size:1.15rem;
+    font-size:.85rem;
     font-weight:700;
     color:var(--ink);
     display:block;
   }
-  .bgm-btn .bs{
-    font-size:.65rem;
-    color:#8a8470;
-    display:block;
-    margin-top:2px;
-  }
-  .bgm-btn.selected{ border-color:var(--reed); background:#e9f0e6; }
-  .bgm-btn.selected .bs{ color:var(--reed); font-weight:700; }
-  .bgm-btn.empty{ opacity:.4; cursor:not-allowed; }
+  .char-btn.selected{ border-color:var(--reed); background:#e9f0e6; }
+  .char-btn.selected .bl{ color:var(--reed); }
+  .char-btn.empty{ opacity:.4; cursor:not-allowed; }
 
   .nav-arrow{
     position:absolute;
@@ -384,88 +409,31 @@
     margin-top:10px;
   }
 
-  /* playback overlay */
-  .overlay{
-    display:none;
-    position:fixed;
-    inset:0;
-    background:#0e1120;
-    z-index:50;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    padding:20px;
-  }
-  .overlay.show{ display:flex; }
-  .ov-stage{
+  /* ---- 回答一覧テーブル ---- */
+  .table-scroll{ overflow-x:auto; }
+  .subs-table{
+    border-collapse:collapse;
     width:100%;
-    max-width:820px;
-    aspect-ratio:16/9;
-    border-radius:14px;
-    overflow:hidden;
-    box-shadow:0 20px 60px rgba(0,0,0,.6);
-    position:relative;
-    background:#05070f;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    font-size:.8rem;
   }
-  .ov-stage img{ width:100%; height:100%; object-fit:contain; display:block; }
-  .ov-caption{
-    position:absolute;
-    left:0; right:0; bottom:0;
-    background:linear-gradient(0deg, rgba(0,0,0,.65), transparent);
-    color:#f3ecd9;
-    padding:16px 20px 12px;
-    font-family:"Shippori Mincho", serif;
-    font-size:1rem;
-  }
-  .ov-progress{
-    display:flex;
-    gap:6px;
-    width:100%;
-    max-width:820px;
-    margin-top:14px;
-  }
-  .ov-seg{
-    flex:1;
-    height:5px;
-    background:#2c3150;
-    border-radius:3px;
-    overflow:hidden;
-  }
-  .ov-seg i{
-    display:block;
-    height:100%;
-    width:0%;
-    background:var(--gold);
-    transition:width linear;
-  }
-  .ov-seg.filled i{ width:100%; transition:none; }
-  .ov-controls{
-    margin-top:18px;
-    display:flex;
-    gap:12px;
-    flex-wrap:wrap;
-    justify-content:center;
-  }
-  .ov-btn{
-    background:#232946;
+  .subs-table th, .subs-table td{
     border:1px solid var(--dusk-2);
-    color:#e4e8f5;
-    padding:9px 20px;
-    border-radius:999px;
-    font-size:.85rem;
-    cursor:pointer;
-    font-family:"Zen Kaku Gothic New", sans-serif;
-  }
-  .ov-end{
+    padding:6px 10px;
     text-align:center;
-    color:var(--gold-soft);
-    font-family:"Shippori Mincho", serif;
+    white-space:nowrap;
+    color:#dfe3f2;
   }
-  .ov-end h3{ font-size:1.3rem; margin-bottom:6px; }
-  .ov-end p{ color:#b9c0d6; font-size:.85rem; font-family:"Zen Kaku Gothic New", sans-serif; }
+  .subs-table th{
+    background:#181c30;
+    color:var(--gold-soft);
+  }
+  .subs-thumb{
+    width:24px; height:24px;
+    object-fit:cover;
+    border-radius:4px;
+    vertical-align:middle;
+    margin-right:4px;
+  }
 
 </style>
 </head>
@@ -473,8 +441,8 @@
 
 <div class="app">
   <header>
-    <h1>BGM紙芝居アプリ</h1>
-    <p>写真とBGMを組み合わせて、紙芝居をつくろう</p>
+    <h1>推しキャラえらびアプリ</h1>
+    <p>写真とキャラクターを組み合わせて、場面ごとに推しキャラを選ぼう</p>
     <div class="tabbar">
       <button class="tab active" id="tabPrep">① じゅんび（先生用）</button>
       <button class="tab" id="tabActivity">② かつどう（こども用）</button>
@@ -498,22 +466,19 @@
   <section id="prepView" hidden>
     <div class="panel">
       <h2>写真を4枚よみこむ</h2>
-      <p class="panel-note">4コマ漫画の1コマずつになる写真を、①〜④の順にアップロードしてください。</p>
+      <p class="panel-note">場面ごとの写真を、①〜④の順にアップロードしてください。</p>
       <div class="slots" id="photoSlots"></div>
     </div>
 
     <div class="panel">
-      <h2>BGMを6つよみこむ</h2>
-      <p class="panel-note">合法に入手した音源から、4〜5秒程度に切り出したファイルを6つ用意してください（A〜Fの並び順に意味はありません）。</p>
-      <div class="slots" id="audioSlots"></div>
-      <div class="prep-cta-row" style="margin-top:14px;">
-        <button class="ghost-btn" id="stopSoundBtnPrep">⏹ いま鳴っている音をとめる</button>
-      </div>
+      <h2>キャラクター画像を6つよみこむ</h2>
+      <p class="panel-note">子どもが場面ごとに選べるキャラクター画像を6つ用意してください（A〜Fの並び順に意味はありません）。</p>
+      <div class="slots" id="charSlots"></div>
     </div>
 
     <div class="panel">
-      <h2>この授業の設定をみんなに共有する</h2>
-      <p class="panel-note">保存を押すと、写真・BGM・場面ごとの割り当てが「今の授業の設定」としてクラウドに保存され、同じURLを開いた児童全員の画面に自動的に反映されます（通信環境が必要です）。</p>
+      <h2>この設定をみんなに共有する</h2>
+      <p class="panel-note">保存を押すと、写真・キャラクター画像が「今の設定」としてクラウドに保存され、同じURLを開いた子ども全員の画面に自動的に反映されます（通信環境が必要です）。</p>
       <div class="prep-cta-row">
         <button class="cta" id="shareBtn" disabled>この内容をきょうの設定として保存する</button>
       </div>
@@ -521,10 +486,19 @@
     </div>
 
     <div class="panel">
-      <h2>保存データについて</h2>
-      <p class="panel-note">アップロードした写真とBGMは、この端末のブラウザ内（IndexedDB）と、共有保存した場合はクラウドの両方に保存されます（音声・写真ファイル自体がリポジトリにコミットされることはありません）。別の授業・別のクラスで使う前は、下のボタンでこの端末とクラウドの両方から消去してください。</p>
+      <h2>みんなの回答を見る</h2>
+      <p class="panel-note">送信された回答（なまえ・場面ごとに選んだキャラ）の一覧です。最新の状態にするには更新してください。</p>
       <div class="prep-cta-row">
-        <button class="ghost-btn danger" id="resetMediaBtn">保存した写真・BGMをすべて消す</button>
+        <button class="ghost-btn" id="refreshSubsBtn">回答一覧を更新する</button>
+      </div>
+      <div id="submissionsHost" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="panel">
+      <h2>保存データについて</h2>
+      <p class="panel-note">アップロードした写真・キャラクター画像は、この端末のブラウザ内（IndexedDB）と、共有保存した場合はクラウドの両方に保存されます（画像ファイル自体がリポジトリにコミットされることはありません）。別の授業・別のクラスで使う前は、下のボタンでこの端末・クラウド・みんなの回答をまとめて消去してください。</p>
+      <div class="prep-cta-row">
+        <button class="ghost-btn danger" id="resetMediaBtn">保存した写真・キャラ・回答をすべて消す</button>
       </div>
     </div>
 
@@ -537,59 +511,55 @@
   <section id="activityView" hidden>
     <div class="toolbar">
       <button class="ghost-btn" id="backPrepBtn">← じゅんび画面にもどる</button>
-      <button class="ghost-btn" id="stopSoundBtnActivity">⏹ 音をとめる</button>
     </div>
 
-    <div class="stage-wrap">
-      <div class="frame">
-        <button class="nav-arrow prev" id="prevBtn" aria-label="前の場面">‹</button>
-        <button class="nav-arrow next" id="nextBtn" aria-label="次の場面">›</button>
-        <div id="cardHost"></div>
+    <!-- 名前入力ゲート -->
+    <div class="name-card" id="nameGate">
+      <h2>おなまえをおしえてね</h2>
+      <p class="panel-note">先生にとどく回答に使います。</p>
+      <input type="text" class="text-input" id="childNameInput" placeholder="なまえ" autocomplete="off">
+      <div class="prep-cta-row" style="margin-top:16px;">
+        <button class="cta" id="nameStartBtn">はじめる</button>
       </div>
     </div>
 
-    <div class="dots" id="dots"></div>
+    <div id="activityMain" hidden>
+      <div class="stage-wrap">
+        <div class="frame">
+          <button class="nav-arrow prev" id="prevBtn" aria-label="前の場面">‹</button>
+          <button class="nav-arrow next" id="nextBtn" aria-label="次の場面">›</button>
+          <div id="cardHost"></div>
+        </div>
+      </div>
 
-    <div class="cta-row">
-      <button class="cta" id="playAllBtn" disabled>紙芝居アニメで見る</button>
-      <div class="cta-sub" id="ctaSub">4つの場面すべてでBGMを選ぶと再生できます</div>
+      <div class="dots" id="dots"></div>
+
+      <div class="cta-row">
+        <button class="cta" id="submitBtn" disabled>送信する</button>
+        <div class="cta-sub" id="submitStatus">4つの場面すべてでキャラを選ぶと送信できます</div>
+      </div>
     </div>
   </section>
 </div>
 
-<div class="overlay" id="overlay">
-  <div class="ov-stage" id="ovStage"></div>
-  <div class="ov-progress" id="ovProgress"></div>
-  <div class="ov-controls">
-    <button class="ov-btn" id="ovStop">⏹ 音をとめる</button>
-    <button class="ov-btn" id="ovNext">つぎへ</button>
-    <button class="ov-btn" id="ovClose">とじる</button>
-    <button class="ov-btn" id="ovReplay">もう一度さいせい</button>
-  </div>
-</div>
-
 <script>
 /* ---------- constants ---------- */
-const PANEL_COUNT = 4; // 場面（写真）の数
-const LETTERS = ["A","B","C","D","E","F"]; // BGMの選択肢
-const BGM_COUNT = LETTERS.length;
-const SLIDE_DURATION_MS = 5000; // 紙芝居再生：1コマにつき固定5秒で自動的に次へ
+const SCENE_COUNT = 4; // 場面（写真）の数
+const CHAR_LETTERS = ["A","B","C","D","E","F"]; // キャラクターの選択肢
+const CHAR_COUNT = CHAR_LETTERS.length;
 
 /* ---------- state ---------- */
-let photos = [null,null,null,null];             // {url,name,blob}
-let audioSlots = new Array(BGM_COUNT).fill(null); // {url,name,blob,el}
-let assign = [null,null,null,null];             // letter assigned to each panel, or null
-let current = 0;          // current panel index in activity view
-let playToken = 0;
-let activeAudio = null;   // the <audio> currently sounding, from ANY source (preview or kamishibai)
+let photos = new Array(SCENE_COUNT).fill(null);     // {url,name,blob}
+let characters = new Array(CHAR_COUNT).fill(null);  // {url,name,blob}
+let assign = new Array(SCENE_COUNT).fill(null);     // このタブ(子ども)が場面ごとに選んだ文字、または null
+let current = 0; // current scene index in activity view
 
 /* ============================================================
    ブラウザ内保存（IndexedDB）
-   写真・BGMは著作権上の理由でリポジトリにはコミットしない。
-   この端末のブラウザだけに保存する、あるいは後述のFirebase経由で
-   共有された内容をこの端末にもキャッシュしておく用途に使う。
+   写真・キャラ画像はこの端末のブラウザだけに保存する、あるいは
+   後述のFirebase経由で共有された内容をこの端末にもキャッシュする用途。
    ============================================================ */
-const IDB_NAME = 'bgm-kamishibai';
+const IDB_NAME = 'oshi-chara-app';
 const IDB_VERSION = 1;
 const IDB_STORE = 'media';
 
@@ -644,8 +614,11 @@ async function idbClearAll(){
 /* ---------- helpers ---------- */
 function photoBoxHTML(idx, emptyIcon){
   const p = photos[idx];
-  if(p) return `<img src="${p.url}" alt="${idx+1}コマ目の写真">`;
+  if(p) return `<img src="${p.url}" alt="${idx+1}ばんめの場面の写真">`;
   return `<div class="ph-empty"><span class="icon">${emptyIcon||'🖼'}</span>写真じゅんび中</div>`;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // 準備画面の写真スロットのDOM表示を、現在のphotos[i]に合わせて更新する
@@ -664,20 +637,19 @@ function reflectPhotoSlotUI(i){
     if(input) input.value = '';
   }
 }
-// 準備画面のBGMスロットのDOM表示を、現在のaudioSlots[i]に合わせて更新する
-function reflectAudioSlotUI(i){
-  const as = document.getElementById('audioSlot'+i);
-  if(!as) return;
-  const pbtn = as.querySelector('.preview');
-  if(audioSlots[i]){
-    as.classList.add('filled');
-    document.getElementById('astatus'+i).textContent = audioSlots[i].name;
-    if(pbtn) pbtn.disabled = false;
+// 準備画面のキャラスロットのDOM表示を、現在のcharacters[i]に合わせて更新する
+function reflectCharSlotUI(i){
+  const cs = document.getElementById('charSlot'+i);
+  if(!cs) return;
+  if(characters[i]){
+    cs.classList.add('filled');
+    document.getElementById('charThumb'+i).innerHTML = `<img src="${characters[i].url}" alt="">`;
+    document.getElementById('charStatus'+i).textContent = characters[i].name;
   } else {
-    as.classList.remove('filled');
-    document.getElementById('astatus'+i).textContent = '未読み込み';
-    if(pbtn) pbtn.disabled = true;
-    const input = as.querySelector('input[type=file]');
+    cs.classList.remove('filled');
+    document.getElementById('charThumb'+i).innerHTML = '<span class="ph-empty">⭐</span>';
+    document.getElementById('charStatus'+i).textContent = '未読み込み';
+    const input = cs.querySelector('input[type=file]');
     if(input) input.value = '';
   }
 }
@@ -686,7 +658,7 @@ function reflectAudioSlotUI(i){
    準備画面：写真スロット
    ============================================================ */
 const photoSlotsEl = document.getElementById('photoSlots');
-for(let i=0;i<PANEL_COUNT;i++){
+for(let i=0;i<SCENE_COUNT;i++){
   const div = document.createElement('div');
   div.className = 'slot';
   div.id = 'photoSlot'+i;
@@ -713,72 +685,34 @@ photoSlotsEl.addEventListener('change', (e)=>{
 });
 
 /* ============================================================
-   準備画面：BGMスロット
+   準備画面：キャラクタースロット
    ============================================================ */
-const audioSlotsEl = document.getElementById('audioSlots');
-LETTERS.forEach((L,i)=>{
+const charSlotsEl = document.getElementById('charSlots');
+CHAR_LETTERS.forEach((L,i)=>{
   const div = document.createElement('div');
   div.className = 'slot';
-  div.id = 'audioSlot'+i;
+  div.id = 'charSlot'+i;
   div.innerHTML = `
     <span class="letter">${L}</span>
-    <div class="status" id="astatus${i}">未読み込み</div>
-    <label class="upload">音声を選ぶ
-      <input type="file" accept="audio/*" data-idx="${i}">
+    <div class="thumb" id="charThumb${i}"><span class="ph-empty">⭐</span></div>
+    <div class="status" id="charStatus${i}">未読み込み</div>
+    <label class="upload">画像を選ぶ
+      <input type="file" accept="image/*" data-idx="${i}">
     </label>
-    <button class="preview" disabled data-idx="${i}">▶ ためし聞き</button>
   `;
-  audioSlotsEl.appendChild(div);
+  charSlotsEl.appendChild(div);
 });
-audioSlotsEl.addEventListener('change', (e)=>{
+charSlotsEl.addEventListener('change', (e)=>{
   if(e.target.type !== 'file') return;
   const idx = +e.target.dataset.idx;
   const file = e.target.files[0];
   if(!file) return;
   const url = URL.createObjectURL(file);
-  if(audioSlots[idx] && audioSlots[idx].el){ audioSlots[idx].el.pause(); }
-  const el = new Audio(url);
-  el.preload = 'auto';
-  audioSlots[idx] = { url, name:file.name, blob:file, el };
-  reflectAudioSlotUI(idx);
-  if(file.size > 2*1024*1024){
-    // 大きい音声ファイル(WAV/AIFFなど)は共有保存に時間がかかったり失敗しやすくなるため、軽く注意を促す
-    const statusEl = document.getElementById('astatus'+idx);
-    statusEl.textContent += `（${(file.size/1024/1024).toFixed(1)}MB・大きめです。mp3など軽い形式がおすすめです）`;
-  }
-  renderActivityView(); // refresh bgm buttons enabled state (keeps existing assignments)
-  idbPut('audio'+idx, { name:file.name, type:file.type, blob:file }); // persist for next reload
+  characters[idx] = { url, name:file.name, blob:file };
+  reflectCharSlotUI(idx);
+  renderActivityView(); // refresh character picker (keeps existing assignments)
+  idbPut('char'+idx, { name:file.name, type:file.type, blob:file }); // persist for next reload
 });
-audioSlotsEl.addEventListener('click', (e)=>{
-  const btn = e.target.closest('button.preview');
-  if(!btn || btn.disabled) return;
-  playPreview(+btn.dataset.idx);
-});
-
-/* ============================================================
-   音声再生の一本化：試聴中でも紙芝居再生中でも、
-   「いま鳴っている音」はこの1つの変数・1つの停止関数で管理する。
-   ============================================================ */
-function stopActiveAudio(){
-  if(activeAudio){
-    activeAudio.onended = null;
-    activeAudio.onerror = null;
-    activeAudio.pause();
-    try{ activeAudio.currentTime = 0; }catch(e){}
-    activeAudio = null;
-  }
-}
-function playPreview(idx){
-  if(!audioSlots[idx]) return;
-  stopActiveAudio(); // 前の音を必ず止めてから次を鳴らす
-  const el = audioSlots[idx].el;
-  el.currentTime = 0;
-  activeAudio = el;
-  el.play().catch(()=>{});
-}
-document.getElementById('stopSoundBtnPrep').addEventListener('click', stopActiveAudio);
-document.getElementById('stopSoundBtnActivity').addEventListener('click', stopActiveAudio);
-document.getElementById('ovStop').addEventListener('click', stopActiveAudio);
 
 /* ============================================================
    モード切り替え（準備 ⇔ 活動）＋ 先生用パスワードゲート
@@ -820,7 +754,6 @@ function showPasswordGate(){
   tabActivity.classList.remove('active');
   pwError.hidden = true;
   pwInput.value = '';
-  stopActiveAudio();
   setTimeout(()=> pwInput.focus(), 50);
 }
 function submitPassword(){
@@ -842,8 +775,27 @@ function showPrep(){
   activityView.hidden = true;
   tabPrep.classList.add('active');
   tabActivity.classList.remove('active');
-  stopActiveAudio();
 }
+
+const nameGate = document.getElementById('nameGate');
+const activityMain = document.getElementById('activityMain');
+const childNameInput = document.getElementById('childNameInput');
+
+// この端末・このタブでの子どもの識別用ID。ログインなしで回答を区別するために使う。
+let childId = null;
+let childName = '';
+try{ childName = sessionStorage.getItem('childName') || ''; }catch(e){}
+
+function getChildId(){
+  let id = null;
+  try{ id = sessionStorage.getItem('childId'); }catch(e){}
+  if(!id){
+    id = 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+    try{ sessionStorage.setItem('childId', id); }catch(e){}
+  }
+  return id;
+}
+
 function showActivity(){
   renderActivityView();
   passwordGate.hidden = true;
@@ -851,67 +803,93 @@ function showActivity(){
   activityView.hidden = false;
   tabPrep.classList.remove('active');
   tabActivity.classList.add('active');
-  stopActiveAudio();
+  if(childName){
+    enterActivityMain();
+  } else {
+    nameGate.hidden = false;
+    activityMain.hidden = true;
+    setTimeout(()=> childNameInput.focus(), 50);
+  }
 }
+function enterActivityMain(){
+  nameGate.hidden = true;
+  activityMain.hidden = false;
+  childId = getChildId();
+  loadMyPreviousSubmission();
+}
+document.getElementById('nameStartBtn').addEventListener('click', ()=>{
+  const v = childNameInput.value.trim();
+  if(!v){ childNameInput.focus(); return; }
+  childName = v;
+  try{ sessionStorage.setItem('childName', v); }catch(e){}
+  enterActivityMain();
+});
+childNameInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') document.getElementById('nameStartBtn').click(); });
+
 tabPrep.addEventListener('click', requestPrep);
 tabActivity.addEventListener('click', showActivity);
 document.getElementById('goActivityBtn').addEventListener('click', showActivity);
 document.getElementById('backPrepBtn').addEventListener('click', requestPrep);
 
 /* ============================================================
-   活動画面：4コマカード
+   活動画面：場面カード
    ============================================================ */
 const cardHost = document.getElementById('cardHost');
 
 function renderActivityView(){
   cardHost.innerHTML = '';
-  for(let i=0;i<PANEL_COUNT;i++){
+  for(let i=0;i<SCENE_COUNT;i++){
     const card = document.createElement('div');
     card.className = 'card';
     card.id = 'card'+i;
     card.innerHTML = `
       <div class="illust" id="illust${i}">${photoBoxHTML(i)}</div>
       <div class="card-body">
-        <span class="scene-tag">${i+1}コマ目</span>
-        <p class="picker-label">この場面に合うBGMは？</p>
+        <span class="scene-tag">${i+1}ばんめの場面</span>
+        <p class="picker-label">この場面に合う推しキャラは？</p>
         <div class="picker" id="picker${i}"></div>
       </div>
     `;
     cardHost.appendChild(card);
 
     const picker = card.querySelector('#picker'+i);
-    LETTERS.forEach((L, li)=>{
+    CHAR_LETTERS.forEach((L, li)=>{
       const b = document.createElement('button');
-      b.className = 'bgm-btn';
+      b.className = 'char-btn';
       b.dataset.letter = L;
-      b.innerHTML = `<span class="bl">${L}</span><span class="bs">▶ 聞く</span>`;
-      b.addEventListener('click', ()=> onBgmClick(i, li));
+      b.innerHTML = charButtonInnerHTML(li);
+      b.addEventListener('click', ()=> onCharClick(i, li));
       picker.appendChild(b);
     });
   }
-  if(current >= PANEL_COUNT) current = 0;
+  if(current >= SCENE_COUNT) current = 0;
   renderCard(current);
   updateDots();
   updateCta();
 }
 
-function onBgmClick(panelIdx, letterIdx){
-  if(!audioSlots[letterIdx]){
-    return; // 未読み込みのBGMは選べない
+function charButtonInnerHTML(li){
+  const c = characters[li];
+  const inner = c ? `<img src="${c.url}" alt="">` : `<span class="char-empty">?</span>`;
+  return `<div class="char-thumb">${inner}</div><span class="bl">${CHAR_LETTERS[li]}</span>`;
+}
+
+function onCharClick(sceneIdx, charIdx){
+  if(!characters[charIdx]){
+    return; // 未読み込みのキャラは選べない
   }
-  assign[panelIdx] = LETTERS[letterIdx];
-  refreshPickerUI(panelIdx);
-  playPreview(letterIdx);
+  assign[sceneIdx] = CHAR_LETTERS[charIdx];
+  refreshPickerUI(sceneIdx);
   updateDots();
   updateCta();
 }
 
-function refreshPickerUI(panelIdx){
-  const picker = document.getElementById('picker'+panelIdx);
+function refreshPickerUI(sceneIdx){
+  const picker = document.getElementById('picker'+sceneIdx);
   if(!picker) return;
   [...picker.children].forEach((b,li)=>{
-    b.classList.toggle('selected', assign[panelIdx] === LETTERS[li]);
-    b.classList.toggle('empty', !audioSlots[li]);
+    b.classList.toggle('selected', assign[sceneIdx] === CHAR_LETTERS[li]);
+    b.classList.toggle('empty', !characters[li]);
   });
 }
 
@@ -921,12 +899,12 @@ function renderCard(i){
   if(el) el.classList.add('active');
   refreshPickerUI(i);
   document.getElementById('prevBtn').disabled = (i===0);
-  document.getElementById('nextBtn').disabled = (i===PANEL_COUNT-1);
+  document.getElementById('nextBtn').disabled = (i===SCENE_COUNT-1);
 }
 
 /* dots */
 const dotsEl = document.getElementById('dots');
-for(let i=0;i<PANEL_COUNT;i++){
+for(let i=0;i<SCENE_COUNT;i++){
   const d = document.createElement('button');
   d.className = 'dot';
   d.addEventListener('click', ()=>{ current=i; renderCard(i); updateDots(); });
@@ -944,148 +922,89 @@ document.getElementById('prevBtn').addEventListener('click', ()=>{
   if(current>0){ current--; renderCard(current); updateDots(); }
 });
 document.getElementById('nextBtn').addEventListener('click', ()=>{
-  if(current<PANEL_COUNT-1){ current++; renderCard(current); updateDots(); }
+  if(current<SCENE_COUNT-1){ current++; renderCard(current); updateDots(); }
 });
 
-/* cta */
-const playAllBtn = document.getElementById('playAllBtn');
-const ctaSub = document.getElementById('ctaSub');
+/* submit */
+const submitBtn = document.getElementById('submitBtn');
+const submitStatus = document.getElementById('submitStatus');
 function updateCta(){
   const allSet = assign.every(a => !!a);
-  playAllBtn.disabled = !allSet;
-  ctaSub.textContent = allSet ? "準備できました。紙芝居アニメで見てみよう" : "4つの場面すべてでBGMを選ぶと再生できます";
+  submitBtn.disabled = !allSet;
+  submitStatus.textContent = allSet ? "すべて選べました。送信できます" : `${SCENE_COUNT}つの場面すべてでキャラを選ぶと送信できます`;
 }
 
-/* ============================================================
-   再生（紙芝居アニメ）：1コマにつき固定5秒で自動的に次へ進む
-   ============================================================ */
-const overlay = document.getElementById('overlay');
-const ovStage = document.getElementById('ovStage');
-const ovProgress = document.getElementById('ovProgress');
-
-playAllBtn.addEventListener('click', startPlayback);
-document.getElementById('ovClose').addEventListener('click', closeOverlay);
-document.getElementById('ovReplay').addEventListener('click', startPlayback);
-document.getElementById('ovNext').addEventListener('click', ()=>{
-  const t = ++playToken; // invalidate whatever segment is currently running
-  playSequence(manualNextIdx, t);
-});
-let manualNextIdx = 0;
-
-function closeOverlay(){
-  playToken++; // invalidate any running sequence/timer
-  overlay.classList.remove('show');
-  stopActiveAudio();
-}
-
-function unlockAllAudio(){
-  // iPad Safari: play()+pause() inside the same user-gesture call stack
-  // unlocks each <audio> element so later programmatic play() calls succeed.
-  // Must FULLY FINISH (all promises settled) before real playback starts,
-  // otherwise a late unlock-pause can race with and stop panel 1's playback.
-  const tasks = audioSlots.map(slot=>{
-    if(!slot) return Promise.resolve();
-    const el = slot.el;
-    let p;
-    try{ p = el.play(); }catch(e){ return Promise.resolve(); }
-    if(p && p.then){
-      return p.then(()=>{ el.pause(); el.currentTime = 0; }).catch(()=>{});
+async function loadMyPreviousSubmission(){
+  if(!fbReady || !childId) return;
+  try{
+    const snap = await fbApi.getDoc(fbApi.doc(sessionDocRef, 'submissions', childId));
+    if(snap.exists()){
+      const data = snap.data();
+      if(Array.isArray(data.choices)){
+        assign = data.choices.slice(0, SCENE_COUNT);
+        while(assign.length < SCENE_COUNT) assign.push(null);
+        renderActivityView();
+        submitStatus.textContent = '前回の回答を読み込みました。変更したらもう一度送信してください。';
+      }
     }
-    el.pause(); el.currentTime = 0;
-    return Promise.resolve();
-  });
-  return Promise.all(tasks);
-}
-
-async function startPlayback(){
-  stopActiveAudio();
-  await unlockAllAudio();
-  overlay.classList.add('show');
-  const myToken = ++playToken;
-  ovProgress.innerHTML = '';
-  for(let i=0;i<PANEL_COUNT;i++){
-    const seg = document.createElement('div');
-    seg.className = 'ov-seg';
-    seg.innerHTML = '<i></i>';
-    ovProgress.appendChild(seg);
+  }catch(err){
+    console.warn('前回の回答の読み込みに失敗しました', err);
   }
-  playSequence(0, myToken);
 }
 
-function playSequence(idx, token){
-  if(token !== playToken) return;
-  stopActiveAudio(); // 必ず前のコマの音を止めてから、このコマに入る
-  if(idx >= PANEL_COUNT){
-    showEnd();
+async function submitAnswers(){
+  if(!fbReady){
+    alert('通信の準備ができていません。少し待ってからもう一度お試しください。');
     return;
   }
-  manualNextIdx = idx+1;
-
-  ovStage.innerHTML = photoBoxHTML(idx, '🖼') + `<div class="ov-caption">${idx+1}コマ目</div>`;
-
-  const segs = ovProgress.children;
-  [...segs].forEach((s,i)=>{
-    s.classList.toggle('filled', i<idx);
-    if(i===idx){ s.classList.remove('filled'); s.querySelector('i').style.transition='none'; s.querySelector('i').style.width='0%'; }
-  });
-
-  const letter = assign[idx];
-  const letterIdx = letter ? LETTERS.indexOf(letter) : -1;
-  const slot = letterIdx>=0 ? audioSlots[letterIdx] : null;
-
-  if(slot){
-    const audioEl = slot.el;
-    activeAudio = audioEl;
-    audioEl.currentTime = 0;
-    let playPromise;
-    try{ playPromise = audioEl.play(); }catch(e){ playPromise = null; }
-    // 音声の読み込み・再生に失敗しても、下の固定タイマーで必ず次に進む
-    if(playPromise && playPromise.catch){ playPromise.catch(()=>{}); }
+  if(!childId) childId = getChildId();
+  const prevLabel = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = '送信中…';
+  try{
+    await fbApi.setDoc(fbApi.doc(sessionDocRef, 'submissions', childId), {
+      name: childName,
+      choices: assign,
+      updatedAt: fbApi.serverTimestamp()
+    });
+    submitBtn.textContent = '送信しました ✓';
+    submitStatus.textContent = '先生に送信しました。選び直して、もう一度送信することもできます。';
+  }catch(err){
+    console.error('送信に失敗しました', err);
+    submitBtn.textContent = prevLabel;
+    alert('送信に失敗しました。通信状況を確認してもう一度お試しください。\n(' + err.message + ')');
+  }finally{
+    setTimeout(()=>{
+      submitBtn.disabled = !assign.every(a=>!!a);
+      submitBtn.textContent = prevLabel;
+    }, 2000);
   }
-
-  requestAnimationFrame(()=>{
-    const bar = segs[idx].querySelector('i');
-    bar.style.transition = `width ${SLIDE_DURATION_MS/1000}s linear`;
-    bar.style.width = '100%';
-  });
-
-  // 音声の長さに関わらず、1コマ5秒固定で次のコマ＋次のBGMに切り替える
-  setTimeout(()=>{
-    if(token !== playToken) return;
-    playSequence(idx+1, token);
-  }, SLIDE_DURATION_MS);
 }
-
-function showEnd(){
-  stopActiveAudio();
-  ovStage.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
-    <div class="ov-end"><h3>おわり</h3><p>4つの場面が終わりました</p></div>
-  </div>`;
-  [...ovProgress.children].forEach(s=>s.classList.add('filled'));
-}
+submitBtn.addEventListener('click', submitAnswers);
 
 /* ============================================================
    保存データのリセット（別の授業・別のクラスで使う前に）
-   ローカル（この端末のIndexedDB）とクラウド（Firebase）の両方を消す。
+   ローカル（この端末のIndexedDB）とクラウド（Firebase：設定＋回答）の
+   両方を消す。
    ============================================================ */
 function performLocalReset(){
   photos.forEach(p=>{ if(p){ try{ URL.revokeObjectURL(p.url); }catch(e){} } });
-  audioSlots.forEach(a=>{ if(a){ try{ a.el.pause(); }catch(e){} try{ URL.revokeObjectURL(a.url); }catch(e){} } });
+  characters.forEach(c=>{ if(c){ try{ URL.revokeObjectURL(c.url); }catch(e){} } });
 
-  photos = [null,null,null,null];
-  audioSlots = new Array(BGM_COUNT).fill(null);
-  assign = [null,null,null,null];
+  photos = new Array(SCENE_COUNT).fill(null);
+  characters = new Array(CHAR_COUNT).fill(null);
+  assign = new Array(SCENE_COUNT).fill(null);
   current = 0;
 
-  for(let i=0;i<PANEL_COUNT;i++) reflectPhotoSlotUI(i);
-  for(let i=0;i<BGM_COUNT;i++) reflectAudioSlotUI(i);
+  for(let i=0;i<SCENE_COUNT;i++) reflectPhotoSlotUI(i);
+  for(let i=0;i<CHAR_COUNT;i++) reflectCharSlotUI(i);
   renderActivityView();
 }
 
 async function resetAllMedia(){
   const msg = fbReady
-    ? '保存されている写真とBGMを、この端末とクラウドの両方から消去します。よろしいですか？'
-    : '保存されている写真とBGMをこの端末から消去します。よろしいですか？';
+    ? '保存されている写真・キャラクター画像・みんなの回答を、この端末とクラウドの両方から消去します。よろしいですか？'
+    : '保存されている写真・キャラクター画像をこの端末から消去します。よろしいですか？';
   const ok = window.confirm(msg);
   if(!ok) return;
 
@@ -1094,8 +1013,10 @@ async function resetAllMedia(){
 
   if(fbReady){
     try{
-      await deleteAllChunks();
+      await deleteSubcollection('chunks');
+      await deleteSubcollection('submissions');
       await fbApi.deleteDoc(sessionDocRef);
+      document.getElementById('submissionsHost').innerHTML = '';
     }catch(err){
       console.warn('クラウド側のデータ消去に失敗しました', err);
       alert('この端末のデータは消去しましたが、クラウド側の消去に失敗しました。通信状況を確認してもう一度お試しください。');
@@ -1105,11 +1026,11 @@ async function resetAllMedia(){
 document.getElementById('resetMediaBtn').addEventListener('click', resetAllMedia);
 
 /* ============================================================
-   起動時：IndexedDBに保存済みの写真・BGMがあれば読み込む
+   起動時：IndexedDBに保存済みの写真・キャラ画像があれば読み込む
    （Firebaseから共有データが届いた場合は、その内容で上書きされる）
    ============================================================ */
 async function restoreFromDB(){
-  for(let i=0;i<PANEL_COUNT;i++){
+  for(let i=0;i<SCENE_COUNT;i++){
     const rec = await idbGet('photo'+i);
     if(rec && rec.blob){
       const url = URL.createObjectURL(rec.blob);
@@ -1117,14 +1038,12 @@ async function restoreFromDB(){
       reflectPhotoSlotUI(i);
     }
   }
-  for(let i=0;i<BGM_COUNT;i++){
-    const rec = await idbGet('audio'+i);
+  for(let i=0;i<CHAR_COUNT;i++){
+    const rec = await idbGet('char'+i);
     if(rec && rec.blob){
       const url = URL.createObjectURL(rec.blob);
-      const el = new Audio(url);
-      el.preload = 'auto';
-      audioSlots[i] = { url, name: rec.name, blob: rec.blob, el };
-      reflectAudioSlotUI(i);
+      characters[i] = { url, name: rec.name, blob: rec.blob };
+      reflectCharSlotUI(i);
     }
   }
 }
@@ -1132,17 +1051,19 @@ async function restoreFromDB(){
 /* ============================================================
    Firebase（Firestore）による共有保存
    ------------------------------------------------------------
-   ・写真／BGMは無料枠（Sparkプラン・クレジットカード登録不要）に
+   ・写真／キャラ画像は無料枠（Sparkプラン・クレジットカード登録不要）に
      収めるため、Cloud Storageは使わずFirestoreのドキュメントに
      base64で分割保存する（1ドキュメント上限1MiBのため）。
-   ・写真は送信前にcanvasで長辺960pxまで縮小＋JPEG圧縮してから送る。
-   ・sessions/current が「今の授業の設定」を表すドキュメント、
-     sessions/current/chunks の中に写真・音声の実データを分割保存する。
+   ・画像は送信前にcanvasで長辺960pxまで縮小＋JPEG圧縮してから送る。
+   ・oshi/current が「今の設定（写真・キャラ画像）」を表すドキュメント、
+     oshi/current/chunks の中に実データを分割保存する。
+   ・oshi/current/submissions/{childId} に、子どもごとの回答
+     （なまえ・場面ごとに選んだキャラ）を保存する。
    ・fetch自体（Firebase SDKの読み込み）に失敗しても、それが原因で
      アプリ全体が壊れないように、動的import + try/catchで隔離する。
    ============================================================ */
 
-// ↓ ここにFirebaseコンソールで作成したWebアプリの設定値を貼り付けてください。
+// ↓ Firebaseコンソールで作成したWebアプリの設定値（前回と同じプロジェクトを利用）。
 // これらは秘密情報ではなく（Firestoreのアクセス制御はセキュリティルール側で行うため）、
 // 公開リポジトリに含めて問題ありません。
 const firebaseConfig = {
@@ -1155,13 +1076,13 @@ const firebaseConfig = {
 };
 
 const CHUNK_SIZE = 300000;   // base64文字数の目安（Firestoreの1MiB上限に対して余裕を持たせる）
-const MAX_IMAGE_DIM = 960;   // 送信前に縮小する写真の長辺の最大px
+const MAX_IMAGE_DIM = 960;   // 送信前に縮小する画像の長辺の最大px
 const IMAGE_QUALITY = 0.72;  // JPEG圧縮の品質
 
 let fbReady = false;
 let fbApi = null;          // firebase-firestoreモジュールの名前空間（動的importで取得）
 let db = null;
-let sessionDocRef = null;
+let sessionDocRef = null;  // oshi/current
 let hadSharedSession = false;
 let lastAppliedUpdatedAtMs = null;
 
@@ -1171,7 +1092,7 @@ const shareStatus = document.getElementById('shareStatus');
 function reflectShareUI(){
   if(fbReady){
     shareBtn.disabled = false;
-    shareStatus.textContent = 'この端末から保存すると、同じURLを開いた児童全員に自動的に反映されます。';
+    shareStatus.textContent = 'この端末から保存すると、同じURLを開いた子ども全員に自動的に反映されます。';
   } else {
     shareBtn.disabled = true;
     shareStatus.textContent = '共有機能は準備中です（Firebaseの設定が必要です）。ローカル保存のみで動作します。';
@@ -1182,7 +1103,7 @@ reflectShareUI();
 async function initFirebase(){
   if(!firebaseConfig.apiKey || firebaseConfig.apiKey.indexOf('PASTE_') === 0){
     console.info('Firebase未設定のため、共有機能はオフのまま動作します。');
-    return; // 設定前でもアプリ本体（ローカル保存・再生）は問題なく動く
+    return; // 設定前でもアプリ本体（ローカル保存・選択）は問題なく動く
   }
   try{
     const [{ initializeApp }, fsMod] = await Promise.all([
@@ -1191,9 +1112,8 @@ async function initFirebase(){
     ]);
     const app = initializeApp(firebaseConfig);
     // 学校のネットワーク（プロキシ・フィルタリング機器など）ではFirestoreの
-    // 既定のストリーミング接続(WebChannel)がうまく動かず、まとまった量の書き込みで
-    // "Write stream exhausted maximum allowed queued writes" のように詰まることが
-    // ある。long polling方式に固定することで、そうした環境でも動作しやすくする。
+    // 既定のストリーミング接続(WebChannel)がうまく動かないことがあるため、
+    // long polling方式に固定して動作しやすくする。
     try{
       db = fsMod.initializeFirestore(app, {
         experimentalAutoDetectLongPolling: true,
@@ -1202,7 +1122,7 @@ async function initFirebase(){
     }catch(e){
       db = fsMod.getFirestore(app); // 既にどこかで初期化済みなどの場合のフォールバック
     }
-    sessionDocRef = fsMod.doc(db, 'sessions', 'current');
+    sessionDocRef = fsMod.doc(db, 'oshi', 'current');
     fbApi = fsMod;
     fbReady = true;
     reflectShareUI();
@@ -1249,11 +1169,9 @@ async function applySharedSnapshot(data){
     chunkMap[key][ci] = d.data().data;
   });
 
-  stopActiveAudio(); // これから中身を丸ごと差し替えるので、鳴っている音は止めておく
-
   const media = data.media || {};
 
-  for(let i=0;i<PANEL_COUNT;i++){
+  for(let i=0;i<SCENE_COUNT;i++){
     const key = 'photo'+i;
     const meta = media[key];
     if(meta && chunkMap[key]){
@@ -1270,48 +1188,36 @@ async function applySharedSnapshot(data){
     reflectPhotoSlotUI(i);
   }
 
-  for(let i=0;i<BGM_COUNT;i++){
-    const key = 'audio'+i;
+  for(let i=0;i<CHAR_COUNT;i++){
+    const key = 'char'+i;
     const meta = media[key];
     if(meta && chunkMap[key]){
       const base64 = chunkMap[key].join('');
-      const blob = base64ToBlob(base64, meta.type || 'audio/mpeg');
-      if(audioSlots[i]){ try{ audioSlots[i].el.pause(); }catch(e){} try{ URL.revokeObjectURL(audioSlots[i].url); }catch(e){} }
+      const blob = base64ToBlob(base64, meta.type || 'image/jpeg');
+      if(characters[i]) try{ URL.revokeObjectURL(characters[i].url); }catch(e){}
       const url = URL.createObjectURL(blob);
-      const el = new Audio(url);
-      el.preload = 'auto';
-      audioSlots[i] = { url, name: meta.name, blob, el };
-      idbPut('audio'+i, { name: meta.name, type: meta.type, blob });
+      characters[i] = { url, name: meta.name, blob };
+      idbPut('char'+i, { name: meta.name, type: meta.type, blob });
     } else if(!meta){
-      if(audioSlots[i]){ try{ audioSlots[i].el.pause(); }catch(e){} }
-      audioSlots[i] = null;
+      if(characters[i]) try{ URL.revokeObjectURL(characters[i].url); }catch(e){}
+      characters[i] = null;
     }
-    reflectAudioSlotUI(i);
-  }
-
-  // 場面ごとの割り当ては「教員が設定した初期状態」として受け取る。
-  // ただしこの端末で児童がすでに何か選び始めている場合は、その選択を
-  // 上書きしない（写真・BGMの差し替えだけ反映する）。
-  const sharedAssign = Array.isArray(data.assign) ? data.assign.slice(0, PANEL_COUNT) : [];
-  while(sharedAssign.length < PANEL_COUNT) sharedAssign.push(null);
-  const localUntouched = assign.every(a=>!a);
-  if(localUntouched){
-    assign = sharedAssign;
+    reflectCharSlotUI(i);
   }
 
   renderActivityView();
 }
 
 // Firestoreは「1ドキュメント1MiB」だけでなく「1回の書き込みリクエスト全体で
-// 約10MiB」という上限も持つ。写真・BGMの合計が大きいクラスでは、チャンクを
+// 約10MiB」という上限も持つ。写真・キャラ画像の合計が大きい場合、チャンクを
 // すべて1回のbatch.commit()にまとめると簡単にこれを超えてしまうため、
 // 個数・合計サイズの両方に安全マージンを持たせて複数のバッチに分けて送る。
 const MAX_BATCH_OPS = 20;                  // 1バッチあたりの操作数（小さめに抑え、書き込みストリームを詰まらせない）
 const MAX_BATCH_BYTES = 1 * 1024 * 1024;   // 1バッチあたりの合計データ量の上限（安全のためかなり小さめに）
 const BATCH_PAUSE_MS = 150;                // 各バッチの間に短い間隔を空け、書き込みストリームへの負荷を抑える
 
-async function deleteAllChunks(){
-  const snap = await fbApi.getDocs(fbApi.collection(sessionDocRef, 'chunks'));
+async function deleteSubcollection(subName){
+  const snap = await fbApi.getDocs(fbApi.collection(sessionDocRef, subName));
   if(snap.empty) return;
   const refs = [];
   snap.forEach(d=> refs.push(d.ref));
@@ -1403,25 +1309,25 @@ async function shareCurrentSetup(){
   const prevLabel = shareBtn.textContent;
   shareBtn.disabled = true;
   shareBtn.textContent = '保存中…';
-  shareStatus.textContent = '写真・BGMをクラウドに送信しています…（データ量や通信状況によっては1分程度かかることがあります）';
+  shareStatus.textContent = '写真・キャラ画像をクラウドに送信しています…（データ量や通信状況によっては1分程度かかることがあります）';
   try{
-    // 1) 写真は送信前に圧縮、BGMはそのまま使う
+    // 1) 画像はすべて送信前に圧縮する
     const prepared = {}; // key -> {name, type, blob} | null
-    for(let i=0;i<PANEL_COUNT;i++){
+    for(let i=0;i<SCENE_COUNT;i++){
       const key = 'photo'+i;
       prepared[key] = (photos[i] && photos[i].blob)
         ? { name: photos[i].name, type: 'image/jpeg', blob: await compressImageBlob(photos[i].blob) }
         : null;
     }
-    for(let i=0;i<BGM_COUNT;i++){
-      const key = 'audio'+i;
-      prepared[key] = (audioSlots[i] && audioSlots[i].blob)
-        ? { name: audioSlots[i].name, type: audioSlots[i].blob.type || 'audio/mpeg', blob: audioSlots[i].blob }
+    for(let i=0;i<CHAR_COUNT;i++){
+      const key = 'char'+i;
+      prepared[key] = (characters[i] && characters[i].blob)
+        ? { name: characters[i].name, type: 'image/jpeg', blob: await compressImageBlob(characters[i].blob) }
         : null;
     }
 
     // 2) 前回分のチャンクを消してから、新しいチャンクを書き込む
-    await deleteAllChunks();
+    await deleteSubcollection('chunks');
 
     const manifestMedia = {};
     const writeItems = [];
@@ -1437,7 +1343,6 @@ async function shareCurrentSetup(){
 
     await fbApi.setDoc(sessionDocRef, {
       updatedAt: fbApi.serverTimestamp(),
-      assign: assign,
       media: manifestMedia
     });
 
@@ -1455,7 +1360,7 @@ async function shareCurrentSetup(){
     }
 
     shareBtn.textContent = '共有しました ✓';
-    shareStatus.textContent = 'クラウドへの保存が完了しました。児童の端末にも自動的に反映されます。';
+    shareStatus.textContent = 'クラウドへの保存が完了しました。子どもの端末にも自動的に反映されます。';
   }catch(err){
     console.error('共有保存に失敗しました', err);
     shareBtn.textContent = prevLabel;
@@ -1469,6 +1374,56 @@ async function shareCurrentSetup(){
   }
 }
 shareBtn.addEventListener('click', shareCurrentSetup);
+
+/* ============================================================
+   先生用：みんなの回答一覧
+   ============================================================ */
+async function refreshSubmissions(){
+  const host = document.getElementById('submissionsHost');
+  if(!fbReady){
+    host.innerHTML = '<p class="panel-note">共有機能の準備ができていません。</p>';
+    return;
+  }
+  host.innerHTML = '<p class="panel-note">読み込み中…</p>';
+  try{
+    const snap = await fbApi.getDocs(fbApi.collection(sessionDocRef, 'submissions'));
+    const rows = [];
+    snap.forEach(d=> rows.push(d.data()));
+    rows.sort((a,b)=>{
+      const at = (a.updatedAt && a.updatedAt.toMillis) ? a.updatedAt.toMillis() : 0;
+      const bt = (b.updatedAt && b.updatedAt.toMillis) ? b.updatedAt.toMillis() : 0;
+      return at - bt;
+    });
+    renderSubmissionsTable(rows);
+  }catch(err){
+    console.warn('回答一覧の取得に失敗しました', err);
+    host.innerHTML = '<p class="panel-note">取得に失敗しました。通信状況を確認してもう一度お試しください。</p>';
+  }
+}
+function renderSubmissionsTable(rows){
+  const host = document.getElementById('submissionsHost');
+  if(rows.length === 0){
+    host.innerHTML = '<p class="panel-note">まだ回答はありません。</p>';
+    return;
+  }
+  let html = '<div class="table-scroll"><table class="subs-table"><thead><tr><th>なまえ</th>';
+  for(let i=0;i<SCENE_COUNT;i++) html += `<th>場面${i+1}</th>`;
+  html += '</tr></thead><tbody>';
+  rows.forEach(r=>{
+    html += `<tr><td>${escapeHtml(r.name || '(なまえなし)')}</td>`;
+    for(let i=0;i<SCENE_COUNT;i++){
+      const letter = r.choices && r.choices[i];
+      const li = letter ? CHAR_LETTERS.indexOf(letter) : -1;
+      const c = (li >= 0) ? characters[li] : null;
+      const thumb = c ? `<img src="${c.url}" class="subs-thumb" alt="">` : '';
+      html += `<td>${thumb}${letter || '―'}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  host.innerHTML = html;
+}
+document.getElementById('refreshSubsBtn').addEventListener('click', refreshSubmissions);
 
 /* ---------- init ---------- */
 (async ()=>{
