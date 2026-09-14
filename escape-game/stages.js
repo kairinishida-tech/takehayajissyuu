@@ -9,7 +9,7 @@
  * ▼ 共通スキーマ（すべてのステージが持つ項目）
  *   id:     ステージの一意なID（文字列）
  *   title:  ステージのタイトル
- *   type:   出題形式。"quiz" | "code-input" | "order" | "blackjack" のいずれか
+ *   type:   出題形式。"quiz" | "code-input" | "order" | "blackjack" | "fishing" のいずれか
  *           （新しい形式を追加する場合は main.js の RENDERERS に
  *             追加すればOK。詳しくは main.js のコメント参照）
  *   prompt: 問題文
@@ -45,6 +45,16 @@
  *     }
  *     ※ choices/answer/items 等は不要。勝敗判定・カードの配布などは
  *        すべて main.js の renderBlackjack が自動で行う
+ *
+ *   "fishing"（お題に合う英単語の魚だけをタップして釣り上げるゲーム）
+ *     themeLabel:    画面上部に出すお題文言（例:「どうぶつの えいたんごを つろう！」）
+ *     timeLimitSec:  制限時間（秒）
+ *     targetCatches: この数だけ正解の魚を釣ればクリア
+ *     correctWords:  お題に合う単語の配列（この単語の魚をタップすると釣れる）
+ *     wrongWords:    お題に合わない単語の配列（タップすると「噛まれて」やり直し）
+ *     ※ correctWords/wrongWordsを書き換えるだけでテーマ（お題）ごと差し替えられる。
+ *        出現する魚は正解6割程度の比率でランダムに選ばれる。
+ *        時間切れで目標数に届かない場合も「噛まれる」演出のあとやり直しになる。
  *
  * ---------------------------------------------------------------
  * ここから下は【動作確認用ステージ】です。
@@ -139,6 +149,21 @@ const STAGES = [
       },
     ],
     hint: "イヤホンから導線を取り出すところからスタートだよ。",
+  },
+  {
+    id: "stage-fishing",
+    title: "だい5もん：えいたんご つりゲーム",
+    type: "fishing",
+    prompt:
+      "およいでくる えいたんごの さかなの中から、おだいに あう たんごだけを タップして つろう！ ちがう たんごは タップせず 見のがしてね。",
+    image: null,
+    themeLabel: "どうぶつの えいたんごを つろう！",
+    timeLimitSec: 30,
+    targetCatches: 5,
+    // correctWords/wrongWords を書き換えるだけでお題（テーマ）ごと差し替えられる。
+    correctWords: ["cat", "dog", "bird", "fish", "lion", "panda", "rabbit", "elephant"],
+    wrongWords: ["red", "blue", "one", "two", "apple", "banana", "chair", "book"],
+    hint: "どうぶつの単語だけをタップしてつかまえよう。ちがう単語はタップせず見送ろう！",
   },
 ];
 

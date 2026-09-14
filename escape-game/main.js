@@ -9,7 +9,7 @@
  *   1. stages.js に新しい type のステージを追加する
  *   2. このファイルの RENDERERS に「type名: 描画関数」を1行追加する
  *   3. 描画関数を1つ実装する（下の renderQuiz / renderCodeInput /
- *      renderOrder / renderBlackjack を参考にしてください）
+ *      renderOrder / renderBlackjack / renderFishing を参考にしてください）
  *      描画関数は (stage, container, handleResult, advanceStage) を受け取ります。
  *        - container に自分のUIを組み立てて追加する
  *        - 正解/不正解が決まったタイミングで handleResult(isCorrect, options) を呼ぶ
@@ -577,12 +577,228 @@
     dealInitial();
   }
 
+  /** 魚が同時に画面に出る最大数（多すぎて混乱しないように制限） */
+  const FISHING_MAX_CONCURRENT = 4;
+  /** 魚を生成しにいく間隔(ms)。実際に出るかはMAX_CONCURRENTの空き次第 */
+  const FISHING_SPAWN_INTERVAL_MS = 1300;
+  /** 魚が画面を泳ぎきるのにかける時間の範囲(ms)＝3〜6秒 */
+  const FISHING_MIN_DURATION_MS = 3000;
+  const FISHING_MAX_DURATION_MS = 6000;
+  /** 池の外に完全に隠れるための余白(px)。魚のだいたいの横幅として使う */
+  const FISHING_OFFSCREEN_MARGIN = 160;
+
+  /**
+   * type: "fishing" - お題に合う英単語の魚だけをタップして釣り上げるゲーム。
+   * 目標数に到達したら handleResult(true) で共通の次ステージ遷移に乗せる。
+   * 不正解の魚をタップ／時間切れの場合は「噛まれる」演出のあと、
+   * このステージ内だけでカウント・タイマー・魚をリセットしてやり直す。
+   */
+  function renderFishing(stage, container, handleResult) {
+    const targetCatches = stage.targetCatches || 5;
+    const timeLimitSec = stage.timeLimitSec || 30;
+    const correctWords = stage.correctWords || [];
+    const wrongWords = stage.wrongWords || [];
+
+    const wrap = document.createElement("div");
+    wrap.className = "fishing-wrap";
+
+    const themeEl = document.createElement("p");
+    themeEl.className = "fishing-theme";
+    themeEl.textContent = "🎯 " + (stage.themeLabel || "");
+
+    const statusRow = document.createElement("div");
+    statusRow.className = "fishing-status";
+    const timerEl = document.createElement("span");
+    timerEl.className = "fishing-timer";
+    const countEl = document.createElement("span");
+    countEl.className = "fishing-count";
+    statusRow.appendChild(timerEl);
+    statusRow.appendChild(countEl);
+
+    const pondOuter = document.createElement("div");
+    pondOuter.className = "fishing-pond-outer";
+    const pond = document.createElement("div");
+    pond.className = "fishing-pond";
+    const biteOverlay = document.createElement("div");
+    biteOverlay.className = "fishing-bite-overlay";
+    biteOverlay.hidden = true;
+    const biteText = document.createElement("p");
+    biteText.className = "fishing-bite-text";
+    biteText.textContent = "🐟💢 いたい！ 小指を かまれた！";
+    const biteSub = document.createElement("p");
+    biteSub.className = "fishing-bite-sub";
+    biteSub.textContent = "もういちど さいしょから ちょうせん！";
+    biteOverlay.appendChild(biteText);
+    biteOverlay.appendChild(biteSub);
+    pondOuter.appendChild(pond);
+    pondOuter.appendChild(biteOverlay);
+
+    wrap.appendChild(themeEl);
+    wrap.appendChild(statusRow);
+    wrap.appendChild(pondOuter);
+    container.appendChild(wrap);
+
+    let caught = 0;
+    let timeLeft = timeLimitSec;
+    let isGameOver = false; // trueの間はタップ判定・出現を止める（結果演出中/リセット中）
+    let spawnTimer = null;
+    let countdownTimer = null;
+    const activeFish = new Set(); // { el, caught, escapeTimer } のSet
+
+    function pickWord() {
+      const useCorrect = correctWords.length > 0 && (Math.random() < 0.6 || wrongWords.length === 0);
+      if (useCorrect) {
+        return { word: correctWords[randInt(0, correctWords.length - 1)], isCorrect: true };
+      }
+      return { word: wrongWords[randInt(0, wrongWords.length - 1)], isCorrect: false };
+    }
+
+    function updateStatus() {
+      timerEl.textContent = `⏱ のこり ${Math.max(timeLeft, 0)}びょう`;
+      countEl.textContent = `🐟 ${caught} / ${targetCatches} ひき`;
+    }
+
+    function removeFish(record) {
+      clearTimeout(record.escapeTimer);
+      activeFish.delete(record);
+      if (record.el.parentNode) record.el.parentNode.removeChild(record.el);
+    }
+
+    function spawnFish() {
+      if (isGameOver || activeFish.size >= FISHING_MAX_CONCURRENT) return;
+
+      const pondWidth = pond.clientWidth || 300;
+      const pondHeight = pond.clientHeight || 200;
+      const { word, isCorrect } = pickWord();
+      const fromLeft = Math.random() < 0.5;
+      const durationMs =
+        FISHING_MIN_DURATION_MS + Math.random() * (FISHING_MAX_DURATION_MS - FISHING_MIN_DURATION_MS);
+      const startX = fromLeft ? -FISHING_OFFSCREEN_MARGIN : pondWidth + FISHING_OFFSCREEN_MARGIN;
+      const endX = fromLeft ? pondWidth + FISHING_OFFSCREEN_MARGIN : -FISHING_OFFSCREEN_MARGIN;
+      const top = Math.random() * Math.max(pondHeight - 56, 0);
+
+      const fishEl = document.createElement("button");
+      fishEl.type = "button";
+      fishEl.className = "fishing-fish";
+      fishEl.textContent = `🐟 ${word}`;
+      fishEl.style.top = `${top}px`;
+      fishEl.style.left = `${startX}px`;
+      pond.appendChild(fishEl);
+
+      // 1フレーム後にtransitionを設定してから位置を変えることで、
+      // 確実にアニメーション(泳ぎ)として認識させる
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          fishEl.style.transition = `left ${durationMs}ms linear`;
+          fishEl.style.left = `${endX}px`;
+        });
+      });
+
+      const record = { el: fishEl, isCorrect };
+      record.escapeTimer = setTimeout(() => {
+        removeFish(record); // タップされないまま泳ぎきったら見逃したことになる（ペナルティなし）
+      }, durationMs + 100);
+      activeFish.add(record);
+
+      fishEl.addEventListener("click", () => {
+        if (isGameOver || !activeFish.has(record)) return;
+        clearTimeout(record.escapeTimer);
+        if (record.isCorrect) {
+          onCatchCorrect(record);
+        } else {
+          onCatchWrong(record);
+        }
+      });
+    }
+
+    function onCatchCorrect(record) {
+      record.el.classList.add("is-caught-correct");
+      record.el.disabled = true;
+      activeFish.delete(record);
+      setTimeout(() => {
+        if (record.el.parentNode) record.el.parentNode.removeChild(record.el);
+      }, 350);
+
+      caught += 1;
+      updateStatus();
+
+      if (caught >= targetCatches) {
+        winGame();
+      }
+    }
+
+    function onCatchWrong(record) {
+      record.el.classList.add("is-caught-wrong");
+      record.el.disabled = true;
+      activeFish.delete(record);
+      failGame();
+    }
+
+    function stopLoops() {
+      isGameOver = true;
+      if (spawnTimer) clearInterval(spawnTimer);
+      if (countdownTimer) clearInterval(countdownTimer);
+      spawnTimer = null;
+      countdownTimer = null;
+      activeFish.forEach((record) => clearTimeout(record.escapeTimer));
+    }
+
+    function winGame() {
+      stopLoops();
+      handleResult(true);
+    }
+
+    function failGame() {
+      stopLoops();
+      biteOverlay.hidden = false;
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(200);
+        } catch (e) {
+          /* 対応していない端末では無視 */
+        }
+      }
+      setTimeout(() => {
+        biteOverlay.hidden = true;
+        startGame();
+      }, 1500);
+    }
+
+    function startGame() {
+      isGameOver = false;
+      caught = 0;
+      timeLeft = timeLimitSec;
+      pond.innerHTML = "";
+      activeFish.clear();
+      updateStatus();
+
+      spawnFish(); // 開始直後に池が空にならないよう1匹すぐ出す
+      spawnTimer = setInterval(spawnFish, FISHING_SPAWN_INTERVAL_MS);
+      countdownTimer = setInterval(() => {
+        timeLeft -= 1;
+        updateStatus();
+        if (timeLeft <= 0) {
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+          if (caught >= targetCatches) {
+            winGame();
+          } else {
+            failGame();
+          }
+        }
+      }, 1000);
+    }
+
+    startGame();
+  }
+
   // type名 → 描画関数 のマップ。新しい type はここに追加するだけ。
   const RENDERERS = {
     quiz: renderQuiz,
     "code-input": renderCodeInput,
     order: renderOrder,
     blackjack: renderBlackjack,
+    fishing: renderFishing,
   };
 
   // ------------------------------------------------------------
@@ -608,7 +824,7 @@
     updateProgress();
 
     stageTitleEl.textContent = stage.title;
-    stagePromptEl.textContent = stage.prompt;
+    stagePromptEl.textContent = stage.prompt || "";
 
     if (stage.image) {
       stageImageEl.src = stage.image;
