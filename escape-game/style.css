@@ -1,0 +1,490 @@
+/* ---------------------------------------------------------------
+   style.css
+   小学生がiPad(Safari)でタップ操作する前提のスタイル。
+   - ホバーに依存する演出は使わない
+   - タップ領域は最低44px x 44px を確保
+   - 縦向き/横向きどちらでも崩れないようにする
+--------------------------------------------------------------- */
+
+:root {
+  --color-bg-1: #6f7bf7;
+  --color-bg-2: #9f6ff5;
+  --color-primary: #ff8a3d;
+  --color-primary-dark: #e56e1f;
+  --color-secondary: #4dc3a3;
+  --color-secondary-dark: #33a184;
+  --color-correct: #35c165;
+  --color-wrong: #ff5a5f;
+  --color-card-bg: #ffffff;
+  --color-text: #2b2b3a;
+  --color-text-sub: #6a6a7d;
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --tap-min: 44px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 独自のdisplay指定(.btnなど)がUAデフォルトのhidden挙動を上書きしてしまうため、
+   [hidden]属性を最優先で効かせる */
+[hidden] {
+  display: none !important;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
+  color: var(--color-text);
+  background: linear-gradient(135deg, var(--color-bg-1), var(--color-bg-2));
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  /* iPadでの意図しない拡大縮小・選択・長押しコールアウトを防ぐ */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ---------- 画面切り替え ---------- */
+
+.screen {
+  display: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+}
+
+.screen.is-active {
+  display: flex;
+}
+
+#screen-stage.is-active {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+#screen-clear.is-active {
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---------- カード共通 ---------- */
+
+.card {
+  background: var(--color-card-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* ---------- タイトル画面 ---------- */
+
+.title-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.app-title {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.app-sub {
+  margin: 0;
+  font-size: clamp(1rem, 2.6vw, 1.2rem);
+  color: var(--color-text-sub);
+}
+
+/* ---------- 共通ボタン ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  padding: 14px 28px;
+  border: none;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
+}
+
+.btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.08);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 6px 0 var(--color-primary-dark);
+}
+.btn-primary:active { box-shadow: 0 2px 0 var(--color-primary-dark); }
+
+.btn-secondary {
+  background: var(--color-secondary);
+  color: #fff;
+  box-shadow: 0 6px 0 var(--color-secondary-dark);
+}
+.btn-secondary:active { box-shadow: 0 2px 0 var(--color-secondary-dark); }
+
+.btn-large {
+  font-size: 1.3rem;
+  padding: 18px 36px;
+}
+
+/* ---------- ステージ画面 ---------- */
+
+.stage-topbar {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto 16px;
+}
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  padding: 8px 16px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--color-secondary), var(--color-primary));
+  transition: width 0.4s ease;
+  border-radius: 999px;
+}
+
+.progress-label {
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.stage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 0;
+}
+
+.stage-title {
+  margin: 0;
+  font-size: clamp(1.2rem, 3.4vw, 1.6rem);
+}
+
+.stage-prompt {
+  margin: 0;
+  font-size: clamp(1rem, 2.8vw, 1.25rem);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.stage-image {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.stage-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* quiz用の選択肢ボタン */
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.choice-btn {
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 3px solid #e2e2ef;
+  background: #f7f7fc;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.choice-btn:active {
+  transform: scale(0.97);
+}
+
+.choice-btn.is-correct {
+  background: rgba(53, 193, 101, 0.18);
+  border-color: var(--color-correct);
+}
+
+.choice-btn.is-wrong {
+  background: rgba(255, 90, 95, 0.18);
+  border-color: var(--color-wrong);
+  animation: shake 0.35s ease;
+}
+
+.choice-btn.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* code-input用 */
+.code-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.code-input-field {
+  flex: 1;
+  min-width: 160px;
+  min-height: var(--tap-min);
+  font-size: 1.2rem;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 3px solid #e2e2ef;
+  text-align: center;
+}
+
+.code-input-field.is-wrong {
+  border-color: var(--color-wrong);
+  animation: shake 0.35s ease;
+}
+
+/* order用 */
+.order-piece-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.order-piece {
+  min-width: 56px;
+  min-height: 56px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 3px solid #e2e2ef;
+  background: #f7f7fc;
+  font-size: 1.3rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.order-piece.is-picked {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.order-answer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  min-height: 60px;
+  padding: 10px;
+  background: #f0f0f8;
+  border-radius: var(--radius-md);
+}
+
+.order-answer-slot {
+  min-width: 56px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 2px dashed #c9c9dd;
+  font-size: 1.3rem;
+  font-weight: 800;
+  background: #fff;
+}
+
+.stage-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.feedback {
+  min-height: 1.6em;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.feedback.is-correct { color: var(--color-correct); }
+.feedback.is-wrong { color: var(--color-wrong); }
+
+.hint-panel {
+  background: #fff7e0;
+  border: 2px solid #ffd98a;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.hint-text {
+  margin: 0;
+  color: #8a5a00;
+  font-weight: 600;
+}
+
+/* ---------- クリア画面 ---------- */
+
+.clear-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.clear-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  animation: pop-in 0.5s ease;
+}
+
+.clear-sub {
+  margin: 0;
+  color: var(--color-text-sub);
+  font-size: clamp(1rem, 2.6vw, 1.2rem);
+}
+
+.photo-wrap {
+  width: 100%;
+  max-width: 480px;
+  animation: pop-in 0.4s ease;
+}
+
+.final-photo {
+  width: 100%;
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  display: block;
+}
+
+.final-photo[hidden] { display: none; }
+
+.photo-fallback {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  border: 3px dashed #c9c9dd;
+  background: #f0f0f8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-sub);
+  padding: 16px;
+  text-align: center;
+}
+
+.photo-fallback-sub {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.confetti-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---------- アニメーション ---------- */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ---------- 横向き(landscape)での高さ調整 ---------- */
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .card {
+    padding: 20px;
+  }
+  .screen {
+    padding: 12px 16px;
+  }
+}
+
+/* ---------- 小さめの iPad / 縦向き調整 ---------- */
+
+@media (max-width: 480px) {
+  .card {
+    padding: 24px 16px;
+    border-radius: var(--radius-md);
+  }
+}
