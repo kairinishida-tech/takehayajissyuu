@@ -356,6 +356,137 @@ button {
   background: #fff;
 }
 
+/* orderのリッチ版（{label, detail}のカードを▲▼で並べ替える形式） */
+.order-rich-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.order-rich-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f7f7fc;
+  border: 3px solid #e2e2ef;
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+}
+
+.order-rich-label {
+  flex: 1;
+  min-height: var(--tap-min);
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.order-rich-controls {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.order-rich-btn {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border-radius: 10px;
+  border: 2px solid #d8d8e6;
+  background: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-rich-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.order-detail-panel {
+  margin-top: -4px;
+}
+
+/* ---------- ブラックジャック(blackjack)用 ---------- */
+
+.bj-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bj-heading {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.bj-hand {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 68px;
+}
+
+.bj-card {
+  min-width: 48px;
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 3px solid #e2e2ef;
+  background: #fff;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-text);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.08);
+  animation: pop-in 0.25s ease;
+}
+
+.bj-card-back {
+  background: var(--color-bg-1);
+  border-color: #5a63d8;
+  color: #fff;
+}
+
+.bj-total {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.bj-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bj-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.bj-result-text {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.bj-result-text.is-correct { color: var(--color-correct); }
+.bj-result-text.is-wrong { color: var(--color-wrong); }
+
 .stage-actions {
   display: flex;
   justify-content: center;

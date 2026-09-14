@@ -9,10 +9,17 @@
  *   1. stages.js に新しい type のステージを追加する
  *   2. このファイルの RENDERERS に「type名: 描画関数」を1行追加する
  *   3. 描画関数を1つ実装する（下の renderQuiz / renderCodeInput /
- *      renderOrder を参考にしてください）
- *      描画関数は (stage, container, handleResult) を受け取り、
- *      正解/不正解が決まったタイミングで handleResult(true/false)
- *      を呼び出すだけでOK。あとは共通ロジックが進行を管理します。
+ *      renderOrder / renderBlackjack を参考にしてください）
+ *      描画関数は (stage, container, handleResult, advanceStage) を受け取ります。
+ *        - container に自分のUIを組み立てて追加する
+ *        - 正解/不正解が決まったタイミングで handleResult(isCorrect, options) を呼ぶ
+ *          （options.wrongMessage / options.correctMessage で
+ *            共通フィードバック欄の文言を上書きできる。省略時はデフォルト文言）
+ *          → handleResult(true, ...) を呼ぶと、共通のフィードバック演出のあと
+ *            自動で次のステージに進みます
+ *        - ブラックジャックのように「結果画面に自前のボタンを出して、
+ *          押されたタイミングで次に進みたい」場合は、共通フィードバックを
+ *          経由せずに advanceStage() を直接呼んでもOKです
  * ---------------------------------------------------------------
  */
 
@@ -174,8 +181,24 @@
     container.appendChild(row);
   }
 
-  /** type: "order" - ピースを正しい順番でタップしていく */
+  /**
+   * type: "order" のディスパッチャー。
+   * items が文字列の配列なら renderOrderSimple（タップして並べる形式）、
+   * items が {label, detail} のオブジェクトの配列なら renderOrderRich
+   * （リスト並べ替え＋詳細ポップアップ形式）に振り分ける。
+   */
   function renderOrder(stage, container, handleResult) {
+    const items = stage.items || [];
+    const isRich = items.length > 0 && typeof items[0] === "object";
+    if (isRich) {
+      renderOrderRich(stage, container, handleResult);
+    } else {
+      renderOrderSimple(stage, container, handleResult);
+    }
+  }
+
+  /** type: "order"（シンプル版） - ピースを正しい順番でタップしていく */
+  function renderOrderSimple(stage, container, handleResult) {
     const pieceRow = document.createElement("div");
     pieceRow.className = "order-piece-row";
 
@@ -227,11 +250,339 @@
     container.appendChild(answerRow);
   }
 
+  /** 配列をシャッフルしたコピーを返す（Fisher-Yates） */
+  function shuffleArray(source) {
+    const arr = source.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  /**
+   * type: "order"（リッチ版） - {label, detail} のカードをリスト表示し、
+   * ▲▼ボタンで並べ替える。カードをタップすると detail をポップアップ表示する。
+   * items は「正解の順番」で書かれている前提（correctOrderを省略した場合は
+   * items のインデックス順 [0,1,2,...] がそのまま正解になる）。
+   * 表示は必ずシャッフルした状態から始める。
+   */
+  function renderOrderRich(stage, container, handleResult) {
+    const items = stage.items;
+    const correctOrder = Array.isArray(stage.correctOrder)
+      ? stage.correctOrder
+      : items.map((_, i) => i);
+
+    // シャッフルして表示用の並び(items配列でのインデックス列)を作る。
+    // 万が一シャッフル結果がそのまま正解と一致したら振り直す。
+    let displayOrder = shuffleArray(correctOrder);
+    if (items.length > 1) {
+      let guard = 0;
+      while (
+        displayOrder.every((v, i) => v === correctOrder[i]) &&
+        guard < 10
+      ) {
+        displayOrder = shuffleArray(correctOrder);
+        guard += 1;
+      }
+    }
+
+    const listEl = document.createElement("div");
+    listEl.className = "order-rich-list";
+
+    const detailPanel = document.createElement("div");
+    detailPanel.className = "hint-panel order-detail-panel";
+    detailPanel.hidden = true;
+    const detailText = document.createElement("p");
+    detailText.className = "hint-text";
+    detailPanel.appendChild(detailText);
+
+    function renderList() {
+      listEl.innerHTML = "";
+      displayOrder.forEach((originalIndex, pos) => {
+        const item = items[originalIndex];
+
+        const row = document.createElement("div");
+        row.className = "order-rich-item";
+
+        const labelBtn = document.createElement("button");
+        labelBtn.type = "button";
+        labelBtn.className = "order-rich-label";
+        labelBtn.textContent = item.label;
+        labelBtn.addEventListener("click", () => {
+          if (!item.detail) return;
+          detailText.textContent = item.detail;
+          detailPanel.hidden = false;
+        });
+
+        const controls = document.createElement("div");
+        controls.className = "order-rich-controls";
+
+        const upBtn = document.createElement("button");
+        upBtn.type = "button";
+        upBtn.className = "order-rich-btn";
+        upBtn.textContent = "▲";
+        upBtn.setAttribute("aria-label", "上へ");
+        upBtn.disabled = pos === 0;
+        upBtn.addEventListener("click", () => {
+          if (pos === 0) return;
+          [displayOrder[pos - 1], displayOrder[pos]] = [
+            displayOrder[pos],
+            displayOrder[pos - 1],
+          ];
+          renderList();
+        });
+
+        const downBtn = document.createElement("button");
+        downBtn.type = "button";
+        downBtn.className = "order-rich-btn";
+        downBtn.textContent = "▼";
+        downBtn.setAttribute("aria-label", "下へ");
+        downBtn.disabled = pos === displayOrder.length - 1;
+        downBtn.addEventListener("click", () => {
+          if (pos === displayOrder.length - 1) return;
+          [displayOrder[pos], displayOrder[pos + 1]] = [
+            displayOrder[pos + 1],
+            displayOrder[pos],
+          ];
+          renderList();
+        });
+
+        controls.appendChild(upBtn);
+        controls.appendChild(downBtn);
+        row.appendChild(labelBtn);
+        row.appendChild(controls);
+        listEl.appendChild(row);
+      });
+    }
+
+    renderList();
+
+    const checkBtn = document.createElement("button");
+    checkBtn.type = "button";
+    checkBtn.className = "btn btn-primary";
+    checkBtn.textContent = "✅ これでかくにん";
+    checkBtn.addEventListener("click", () => {
+      if (isLocked) return;
+      const isCorrect = displayOrder.every((v, i) => v === correctOrder[i]);
+      handleResult(isCorrect, {
+        wrongMessage: "❌ ここが ちがうかも…もういちど ならべかえてみよう！",
+      });
+    });
+
+    container.appendChild(listEl);
+    container.appendChild(detailPanel);
+    container.appendChild(checkBtn);
+  }
+
+  /** ブラックジャックのルール既定値（stage.rules で上書き可能） */
+  const BLACKJACK_DEFAULT_RULES = {
+    maxTotal: 21,
+    dealerStandsAt: 17,
+    cardMin: 1,
+    cardMax: 10,
+  };
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  /**
+   * type: "blackjack" - コンピュータとの数字ブラックジャック対戦。
+   * プレイヤーが勝ったら advanceStage() を直接呼んで次のステージへ、
+   * 負け・引き分けの場合は手札をリセットして同じステージ内でやり直せる。
+   */
+  function renderBlackjack(stage, container, handleResult, advanceStage) {
+    const rules = Object.assign({}, BLACKJACK_DEFAULT_RULES, stage.rules || {});
+
+    const cpuSection = document.createElement("div");
+    cpuSection.className = "bj-section";
+    const cpuHeading = document.createElement("p");
+    cpuHeading.className = "bj-heading";
+    cpuHeading.textContent = "🖥 コンピュータ";
+    const cpuHand = document.createElement("div");
+    cpuHand.className = "bj-hand";
+    const cpuTotalEl = document.createElement("p");
+    cpuTotalEl.className = "bj-total";
+    cpuSection.appendChild(cpuHeading);
+    cpuSection.appendChild(cpuHand);
+    cpuSection.appendChild(cpuTotalEl);
+
+    const playerSection = document.createElement("div");
+    playerSection.className = "bj-section";
+    const playerHeading = document.createElement("p");
+    playerHeading.className = "bj-heading";
+    playerHeading.textContent = "🧑 あなた";
+    const playerHand = document.createElement("div");
+    playerHand.className = "bj-hand";
+    const playerTotalEl = document.createElement("p");
+    playerTotalEl.className = "bj-total";
+    playerSection.appendChild(playerHeading);
+    playerSection.appendChild(playerHand);
+    playerSection.appendChild(playerTotalEl);
+
+    const actions = document.createElement("div");
+    actions.className = "bj-actions";
+    const hitBtn = document.createElement("button");
+    hitBtn.type = "button";
+    hitBtn.className = "btn btn-primary";
+    hitBtn.textContent = "🂠 ひく";
+    const standBtn = document.createElement("button");
+    standBtn.type = "button";
+    standBtn.className = "btn btn-secondary";
+    standBtn.textContent = "✋ ステイ";
+    actions.appendChild(hitBtn);
+    actions.appendChild(standBtn);
+
+    const resultEl = document.createElement("div");
+    resultEl.className = "bj-result";
+    resultEl.hidden = true;
+
+    container.appendChild(cpuSection);
+    container.appendChild(playerSection);
+    container.appendChild(actions);
+    container.appendChild(resultEl);
+
+    let playerCards = [];
+    let cpuCards = [];
+    let cpuHidden = true; // trueの間、コンピュータの2枚目以降を伏せて表示する
+    let phase = "player"; // "player" | "cpu" | "done"
+
+    function total(cards) {
+      return cards.reduce((sum, c) => sum + c, 0);
+    }
+
+    function renderCard(el, value, faceDown) {
+      const card = document.createElement("div");
+      card.className = "bj-card" + (faceDown ? " bj-card-back" : "");
+      card.textContent = faceDown ? "？" : String(value);
+      el.appendChild(card);
+    }
+
+    function renderHands() {
+      cpuHand.innerHTML = "";
+      cpuCards.forEach((v, i) => {
+        renderCard(cpuHand, v, cpuHidden && i > 0);
+      });
+      cpuTotalEl.textContent = cpuHidden
+        ? `ごうけい: ${cpuCards[0]} + ？`
+        : `ごうけい: ${total(cpuCards)}`;
+
+      playerHand.innerHTML = "";
+      playerCards.forEach((v) => renderCard(playerHand, v, false));
+      playerTotalEl.textContent = `ごうけい: ${total(playerCards)}`;
+    }
+
+    function setActionsEnabled(enabled) {
+      hitBtn.disabled = !enabled;
+      standBtn.disabled = !enabled;
+    }
+
+    function dealInitial() {
+      playerCards = [
+        randInt(rules.cardMin, rules.cardMax),
+        randInt(rules.cardMin, rules.cardMax),
+      ];
+      cpuCards = [
+        randInt(rules.cardMin, rules.cardMax),
+        randInt(rules.cardMin, rules.cardMax),
+      ];
+      cpuHidden = true;
+      phase = "player";
+      resultEl.hidden = true;
+      resultEl.innerHTML = "";
+      setActionsEnabled(true);
+      renderHands();
+    }
+
+    function endRound(playerWon, message) {
+      phase = "done";
+      setActionsEnabled(false);
+
+      const msg = document.createElement("p");
+      msg.className = "bj-result-text " + (playerWon ? "is-correct" : "is-wrong");
+      msg.textContent = message;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn " + (playerWon ? "btn-primary" : "btn-secondary");
+      btn.textContent = playerWon ? "▶ つぎへ" : "🔁 もういちど";
+      btn.addEventListener("click", () => {
+        if (playerWon) {
+          advanceStage();
+        } else {
+          dealInitial();
+        }
+      });
+
+      resultEl.innerHTML = "";
+      resultEl.appendChild(msg);
+      resultEl.appendChild(btn);
+      resultEl.hidden = false;
+    }
+
+    function finishRound() {
+      const playerTotal = total(playerCards);
+      const cpuTotal = total(cpuCards);
+
+      if (cpuTotal > rules.maxTotal) {
+        endRound(true, `🎉 コンピュータがバースト！(${cpuTotal}) かち！つぎへすすめる`);
+      } else if (playerTotal > cpuTotal) {
+        endRound(true, `🎉 ${playerTotal} たい ${cpuTotal} で かち！つぎへすすめる`);
+      } else if (playerTotal === cpuTotal) {
+        endRound(false, `😢 ${playerTotal} たい ${cpuTotal} で ひきわけ…ざんねん、もういちど`);
+      } else {
+        endRound(false, `😢 ${playerTotal} たい ${cpuTotal} で まけ…ざんねん、もういちど`);
+      }
+    }
+
+    function cpuTurn() {
+      phase = "cpu";
+      cpuHidden = false;
+      setActionsEnabled(false);
+      renderHands();
+
+      function step() {
+        if (total(cpuCards) < rules.dealerStandsAt) {
+          cpuCards.push(randInt(rules.cardMin, rules.cardMax));
+          renderHands();
+          setTimeout(step, 600);
+          return;
+        }
+        finishRound();
+      }
+      setTimeout(step, 600);
+    }
+
+    function playerBust() {
+      cpuHidden = false;
+      renderHands();
+      endRound(false, `💥 バースト！(${total(playerCards)}) ざんねん…もういちど`);
+    }
+
+    hitBtn.addEventListener("click", () => {
+      if (phase !== "player") return;
+      playerCards.push(randInt(rules.cardMin, rules.cardMax));
+      renderHands();
+      if (total(playerCards) > rules.maxTotal) {
+        playerBust();
+      }
+    });
+
+    standBtn.addEventListener("click", () => {
+      if (phase !== "player") return;
+      cpuTurn();
+    });
+
+    dealInitial();
+  }
+
   // type名 → 描画関数 のマップ。新しい type はここに追加するだけ。
   const RENDERERS = {
     quiz: renderQuiz,
     "code-input": renderCodeInput,
     order: renderOrder,
+    blackjack: renderBlackjack,
   };
 
   // ------------------------------------------------------------
@@ -282,21 +633,32 @@
       return;
     }
 
-    renderer(stage, stageBodyEl, (isCorrect) => handleResult(stage, isCorrect));
+    renderer(
+      stage,
+      stageBodyEl,
+      (isCorrect, options) => handleResult(stage, isCorrect, options),
+      advanceStage
+    );
 
     showScreen("stage");
   }
 
-  function handleResult(stage, isCorrect) {
+  /** 次のステージへ進む（すべて終わっていればクリア画面へ） */
+  function advanceStage() {
+    loadStage(currentStageIndex + 1);
+  }
+
+  function handleResult(stage, isCorrect, options) {
+    const opts = options || {};
     if (isCorrect) {
       isLocked = true;
-      feedbackEl.textContent = "🎉 せいかい！";
+      feedbackEl.textContent = opts.correctMessage || "🎉 せいかい！";
       feedbackEl.className = "feedback is-correct";
       setTimeout(() => {
-        loadStage(currentStageIndex + 1);
+        advanceStage();
       }, 900);
     } else {
-      feedbackEl.textContent = "❌ ざんねん、もういちど ちょうせん！";
+      feedbackEl.textContent = opts.wrongMessage || "❌ ざんねん、もういちど ちょうせん！";
       feedbackEl.className = "feedback is-wrong";
     }
   }
