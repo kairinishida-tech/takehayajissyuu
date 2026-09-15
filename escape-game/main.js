@@ -45,7 +45,9 @@
 
   const progressFill = document.getElementById("progress-fill");
   const progressLabel = document.getElementById("progress-label");
+  const progressDotsEl = document.getElementById("progress-dots");
 
+  const stageIconEl = document.getElementById("stage-icon");
   const stageTitleEl = document.getElementById("stage-title");
   const stagePromptEl = document.getElementById("stage-prompt");
   const stageImageEl = document.getElementById("stage-image");
@@ -934,11 +936,44 @@
   // ------------------------------------------------------------
   // ステージ表示・進行
   // ------------------------------------------------------------
+
+  /** type名 → 進捗ドット・ステージヘッダーに使うアイコン。未対応typeは🧩でフォールバック */
+  const STAGE_TYPE_ICONS = {
+    quiz: "🧠",
+    "code-input": "⌨️",
+    order: "🔧",
+    blackjack: "🃏",
+    fishing: "🎣",
+  };
+
+  function iconForStage(stage) {
+    return (stage && STAGE_TYPE_ICONS[stage.type]) || "🧩";
+  }
+
+  /** ステージ数ぶんの進捗ドットを1回だけ作る（すごろく風に現在地がわかる） */
+  function buildProgressDots() {
+    if (!progressDotsEl) return;
+    progressDotsEl.innerHTML = "";
+    STAGES.forEach((stage) => {
+      const dot = document.createElement("span");
+      dot.className = "progress-dot";
+      dot.textContent = iconForStage(stage);
+      progressDotsEl.appendChild(dot);
+    });
+  }
+
   function updateProgress() {
     const total = STAGES.length;
     const current = currentStageIndex + 1;
     progressLabel.textContent = `${current} / ${total}`;
     progressFill.style.width = `${(currentStageIndex / total) * 100}%`;
+
+    if (progressDotsEl) {
+      Array.from(progressDotsEl.children).forEach((dot, i) => {
+        dot.classList.toggle("is-done", i < currentStageIndex);
+        dot.classList.toggle("is-current", i === currentStageIndex);
+      });
+    }
   }
 
   function loadStage(index) {
@@ -953,6 +988,7 @@
     saveProgress();
     updateProgress();
 
+    if (stageIconEl) stageIconEl.textContent = iconForStage(stage);
     stageTitleEl.textContent = stage.title;
     stagePromptEl.textContent = stage.prompt || "";
 
@@ -1029,16 +1065,20 @@
     resize();
     window.addEventListener("resize", resize);
 
-    const colors = ["#ff8a3d", "#4dc3a3", "#6f7bf7", "#ffd93d", "#ff5a5f"];
-    const pieces = Array.from({ length: 90 }, () => ({
+    const colors = [
+      "#ff8a3d", "#4dc3a3", "#6f7bf7", "#ffd93d", "#ff5a5f",
+      "#ff8ac6", "#35c165", "#ffd166",
+    ];
+    const pieces = Array.from({ length: 110 }, () => ({
       x: Math.random() * canvas.width,
       y: -Math.random() * canvas.height,
-      size: 6 + Math.random() * 8,
+      size: 6 + Math.random() * 9,
       speedY: (2 + Math.random() * 3) * window.devicePixelRatio,
       speedX: (Math.random() - 0.5) * 2 * window.devicePixelRatio,
       rotation: Math.random() * 360,
       rotationSpeed: (Math.random() - 0.5) * 10,
       color: colors[Math.floor(Math.random() * colors.length)],
+      shape: Math.random() < 0.3 ? "circle" : "rect",
     }));
 
     let rafId;
@@ -1059,7 +1099,13 @@
         ctx.translate(p.x, p.y);
         ctx.rotate((p.rotation * Math.PI) / 180);
         ctx.fillStyle = p.color;
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        if (p.shape === "circle") {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        }
         ctx.restore();
       });
       rafId = requestAnimationFrame(frame);
@@ -1143,6 +1189,7 @@
   btnRestart.addEventListener("click", restartGame);
 
   // 初期表示（リロード時に途中から再開したい場合はここで復元）
+  buildProgressDots();
   currentStageIndex = loadProgress();
   showScreen("title");
 })();

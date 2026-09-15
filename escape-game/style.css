@@ -9,6 +9,7 @@
 :root {
   --color-bg-1: #6f7bf7;
   --color-bg-2: #9f6ff5;
+  --color-bg-3: #ff8ac6;
   --color-primary: #ff8a3d;
   --color-primary-dark: #e56e1f;
   --color-secondary: #4dc3a3;
@@ -18,9 +19,10 @@
   --color-card-bg: #ffffff;
   --color-text: #2b2b3a;
   --color-text-sub: #6a6a7d;
-  --radius-lg: 24px;
+  --radius-lg: 26px;
   --radius-md: 16px;
   --tap-min: 44px;
+  --accent-gradient: linear-gradient(90deg, #ff8a3d, #ffd166, #4dc3a3, #6f7bf7, #ff8ac6);
 }
 
 * {
@@ -40,9 +42,12 @@ html, body {
 }
 
 body {
+  position: relative;
   font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
   color: var(--color-text);
-  background: linear-gradient(135deg, var(--color-bg-1), var(--color-bg-2));
+  background: linear-gradient(135deg, var(--color-bg-1), var(--color-bg-2) 55%, var(--color-bg-3));
+  background-size: 200% 200%;
+  animation: bg-drift 18s ease-in-out infinite;
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
@@ -50,6 +55,43 @@ body {
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
+}
+
+@keyframes bg-drift {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+
+/* 背景を漂う装飾（鍵・きらきら等）。操作には一切干渉しない */
+.bg-decor {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.bg-decor-item {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  opacity: 0.22;
+  animation: bg-float var(--dur) ease-in-out infinite;
+  animation-delay: var(--delay);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.12));
+}
+
+@keyframes bg-float {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(6px, -18px) rotate(-8deg); }
+  50% { transform: translate(-4px, 8px) rotate(6deg); }
+  75% { transform: translate(-10px, -10px) rotate(-4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none; }
+  .bg-decor-item { animation: none; }
 }
 
 input, textarea {
@@ -91,14 +133,40 @@ button {
 /* ---------- カード共通 ---------- */
 
 .card {
+  position: relative;
   background: var(--color-card-bg);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
-  padding: 32px 24px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 24px 50px rgba(35, 20, 80, 0.28),
+    0 4px 12px rgba(35, 20, 80, 0.12);
+  padding: 34px 24px 28px;
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
   text-align: center;
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: var(--accent-gradient);
+  background-size: 300% 100%;
+  animation: accent-flow 6s linear infinite;
+}
+
+@keyframes accent-flow {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 100% 0%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card::before { animation: none; }
 }
 
 /* ---------- タイトル画面 ---------- */
@@ -110,21 +178,67 @@ button {
   gap: 20px;
 }
 
+.title-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: clamp(2.4rem, 8vw, 3.6rem);
+  line-height: 1;
+}
+
+.title-icon {
+  display: inline-block;
+  animation: title-icon-bounce 2.4s ease-in-out infinite;
+  animation-delay: var(--spin-delay, 0s);
+}
+
+.title-icon-key {
+  animation-name: title-icon-jiggle;
+}
+
+@keyframes title-icon-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-6deg); }
+}
+
+@keyframes title-icon-jiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  10% { transform: rotate(-18deg) scale(1.05); }
+  20% { transform: rotate(14deg) scale(1.05); }
+  30% { transform: rotate(-8deg) scale(1); }
+  40%, 100% { transform: rotate(0deg) scale(1); }
+}
+
 .app-title {
-  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-size: clamp(2rem, 6vw, 2.9rem);
   margin: 0;
   line-height: 1.3;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  background: var(--accent-gradient);
+  background-size: 300% 100%;
+  animation: accent-flow 6s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-icon, .title-icon-key { animation: none; }
 }
 
 .app-sub {
   margin: 0;
   font-size: clamp(1rem, 2.6vw, 1.2rem);
   color: var(--color-text-sub);
+  font-weight: 600;
 }
 
 /* ---------- 共通ボタン ---------- */
 
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -136,8 +250,29 @@ button {
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
+  overflow: hidden;
   transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
+}
+
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.35) 45%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  background-size: 220% 100%;
+  background-position: 120% 0;
+  pointer-events: none;
+}
+
+.btn:not(:disabled):active::after {
+  transition: background-position 0.5s ease;
+  background-position: -20% 0;
 }
 
 .btn:active {
@@ -177,15 +312,55 @@ button {
   width: 100%;
   max-width: 640px;
   margin: 0 auto 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .progress-wrap {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   padding: 8px 16px;
+  box-shadow: 0 6px 16px rgba(35, 20, 80, 0.15);
+}
+
+/* ステージごとのアイコンをたどる「すごろく」風ドット */
+.progress-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progress-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 1.05rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  opacity: 0.65;
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+}
+
+.progress-dot.is-done {
+  background: var(--color-secondary);
+  border-color: var(--color-secondary-dark);
+  opacity: 1;
+}
+
+.progress-dot.is-current {
+  background: #fff;
+  border-color: var(--color-primary);
+  opacity: 1;
+  transform: scale(1.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
 .progress-track {
@@ -215,6 +390,28 @@ button {
   flex-direction: column;
   gap: 18px;
   margin-top: 0;
+}
+
+.stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.stage-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fff3da, #ffe3b0);
+  border: 2px solid #ffd98a;
+  font-size: 1.4rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  animation: pop-in 0.35s ease;
 }
 
 .stage-title {
@@ -672,10 +869,32 @@ button {
   z-index: 2;
 }
 
+.clear-trophy {
+  font-size: clamp(3rem, 10vw, 4.5rem);
+  line-height: 1;
+  animation: trophy-bounce 1.1s ease-in-out infinite;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.2));
+}
+
+@keyframes trophy-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(-4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clear-trophy { animation: none; }
+}
+
 .clear-title {
   margin: 0;
-  font-size: clamp(1.6rem, 5vw, 2.4rem);
-  animation: pop-in 0.5s ease;
+  font-size: clamp(1.8rem, 5.5vw, 2.6rem);
+  font-weight: 900;
+  background: var(--accent-gradient);
+  background-size: 300% 100%;
+  animation: accent-flow 6s linear infinite, pop-in 0.5s ease;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .clear-sub {
@@ -690,10 +909,20 @@ button {
   animation: pop-in 0.4s ease;
 }
 
+.photo-frame {
+  position: relative;
+  padding: 8px;
+  border-radius: calc(var(--radius-md) + 8px);
+  background: var(--accent-gradient);
+  background-size: 300% 100%;
+  animation: accent-flow 6s linear infinite;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.3);
+}
+
 .final-photo {
   width: 100%;
   border-radius: var(--radius-md);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   display: block;
 }
 
