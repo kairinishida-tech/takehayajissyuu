@@ -546,12 +546,12 @@
         if (total(cpuCards) < rules.dealerStandsAt) {
           cpuCards.push(randInt(rules.cardMin, rules.cardMax));
           renderHands();
-          setTimeout(step, 600);
+          setTimeout(step, 400);
           return;
         }
         finishRound();
       }
-      setTimeout(step, 600);
+      setTimeout(step, 400);
     }
 
     function playerBust() {
@@ -579,11 +579,13 @@
 
   /** 魚が同時に画面に出る最大数（多すぎて混乱しないように制限） */
   const FISHING_MAX_CONCURRENT = 4;
-  /** 魚を生成しにいく間隔(ms)。実際に出るかはMAX_CONCURRENTの空き次第 */
-  const FISHING_SPAWN_INTERVAL_MS = 1300;
-  /** 魚が画面を泳ぎきるのにかける時間の範囲(ms)＝3〜6秒 */
-  const FISHING_MIN_DURATION_MS = 3000;
-  const FISHING_MAX_DURATION_MS = 6000;
+  /** 魚を生成しにいく間隔(ms)。実際に出るかはMAX_CONCURRENTの空き次第
+   *  ゲーム全体を短時間で遊べるようにするため、やや速いテンポにしてある */
+  const FISHING_SPAWN_INTERVAL_MS = 900;
+  /** 魚が画面を泳ぎきるのにかける時間の範囲(ms)＝約2.5〜4.5秒（短い制限時間の中で
+   *  何度もチャンスが回ってくるよう、読み取れる範囲でやや短めにしてある） */
+  const FISHING_MIN_DURATION_MS = 2500;
+  const FISHING_MAX_DURATION_MS = 4500;
   /** 池の外に完全に隠れるための余白(px)。魚のだいたいの横幅として使う */
   const FISHING_OFFSCREEN_MARGIN = 160;
 
@@ -646,7 +648,8 @@
     const activeFish = new Set(); // { el, caught, escapeTimer } のSet
 
     function pickWord() {
-      const useCorrect = correctWords.length > 0 && (Math.random() < 0.6 || wrongWords.length === 0);
+      // 短い制限時間の中で確実にチャンスが来るよう、正解をやや多め(65%)に出す
+      const useCorrect = correctWords.length > 0 && (Math.random() < 0.65 || wrongWords.length === 0);
       if (useCorrect) {
         return { word: correctWords[randInt(0, correctWords.length - 1)], isCorrect: true };
       }
