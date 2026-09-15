@@ -308,10 +308,23 @@
         const labelBtn = document.createElement("button");
         labelBtn.type = "button";
         labelBtn.className = "order-rich-label";
-        labelBtn.textContent = item.label;
+
+        if (item.icon) {
+          const iconSpan = document.createElement("span");
+          iconSpan.className = "order-rich-icon";
+          iconSpan.textContent = item.icon;
+          iconSpan.setAttribute("aria-hidden", "true");
+          labelBtn.appendChild(iconSpan);
+        }
+
+        const textSpan = document.createElement("span");
+        textSpan.className = "order-rich-text";
+        textSpan.textContent = item.label;
+        labelBtn.appendChild(textSpan);
+
         labelBtn.addEventListener("click", () => {
           if (!item.detail) return;
-          detailText.textContent = item.detail;
+          detailText.textContent = (item.icon ? item.icon + " " : "") + item.detail;
           detailPanel.hidden = false;
         });
 
