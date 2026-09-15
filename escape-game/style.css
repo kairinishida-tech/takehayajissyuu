@@ -283,6 +283,13 @@ button {
   pointer-events: none;
 }
 
+/* 複数選択クイズ(multiSelect)で選んでいる選択肢 */
+.choice-btn.is-selected {
+  background: rgba(111, 123, 247, 0.18);
+  border-color: var(--color-bg-1);
+  box-shadow: inset 0 0 0 2px rgba(111, 123, 247, 0.3);
+}
+
 /* code-input用 */
 .code-input-row {
   display: flex;
@@ -356,11 +363,19 @@ button {
   background: #fff;
 }
 
-/* orderのリッチ版（{label, detail}のカードを▲▼で並べ替える形式） */
+/* orderのリッチ版（{label, detail, icon}のカードを持ち手スライドで並べ替える形式） */
+.order-rich-draghint {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  text-align: center;
+}
+
 .order-rich-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   text-align: left;
 }
 
@@ -371,28 +386,52 @@ button {
   background: #f7f7fc;
   border: 3px solid #e2e2ef;
   border-radius: var(--radius-md);
-  padding: 6px 8px;
+  padding: 10px 12px;
+  transition: box-shadow 0.15s ease;
+}
+
+.order-rich-item.is-dragging {
+  position: relative;
+  z-index: 5;
+  background: #fffef2;
+  border-color: #ffd98a;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.order-rich-handle {
+  flex-shrink: 0;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border-radius: 10px;
+  border: 2px solid #d8d8e6;
+  background: #fff;
+  font-size: 1.4rem;
+  color: var(--color-text-sub);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .order-rich-label {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: var(--tap-min);
   background: none;
   border: none;
   text-align: left;
-  font-size: 0.98rem;
-  line-height: 1.4;
+  font-size: 1.12rem;
+  line-height: 1.5;
   font-weight: 700;
   color: var(--color-text);
   cursor: pointer;
-  padding: 6px 4px;
+  padding: 8px 6px;
 }
 
 .order-rich-icon {
-  font-size: 1.8rem;
+  font-size: 2.2rem;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -401,30 +440,9 @@ button {
   flex: 1;
 }
 
-.order-rich-controls {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.order-rich-btn {
-  min-width: var(--tap-min);
-  min-height: var(--tap-min);
-  border-radius: 10px;
-  border: 2px solid #d8d8e6;
-  background: #fff;
-  font-size: 1.1rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.order-rich-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
 .order-detail-panel {
   margin-top: -4px;
+  font-size: 1.05rem;
 }
 
 /* ---------- ブラックジャック(blackjack)用 ---------- */

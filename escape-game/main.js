@@ -112,8 +112,22 @@
       .replace(/\s+/g, "");
   }
 
-  /** type: "quiz" - 選択肢から1つタップして答える */
+  /**
+   * type: "quiz" - 選択肢から答える。2つのモードに対応する。
+   *   ① シンプル版（既定）：1つタップしたら即座に正誤判定（answerIndexを使う）
+   *   ② 複数選択版（stage.multiSelect: true）：正解の数だけタップして選び、
+   *      「けってい」ボタンで判定する（correctAnswersを使う。順番は問わない）
+   */
   function renderQuiz(stage, container, handleResult) {
+    if (stage.multiSelect) {
+      renderQuizMultiSelect(stage, container, handleResult);
+    } else {
+      renderQuizSingle(stage, container, handleResult);
+    }
+  }
+
+  /** type: "quiz"（シンプル版） - 選択肢から1つタップして答える */
+  function renderQuizSingle(stage, container, handleResult) {
     const grid = document.createElement("div");
     grid.className = "choice-grid";
 
@@ -138,6 +152,66 @@
     });
 
     container.appendChild(grid);
+  }
+
+  /**
+   * type: "quiz"（複数選択版） - 正解の数だけタップして選び、「けってい」で判定する。
+   * stage.correctAnswers（choicesのインデックス配列）と、選んだ集合が
+   * 完全に一致すれば正解（順番は関係ない）。
+   */
+  function renderQuizMultiSelect(stage, container, handleResult) {
+    const grid = document.createElement("div");
+    grid.className = "choice-grid";
+    const selected = new Set();
+
+    stage.choices.forEach((choiceText, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "choice-btn";
+      btn.textContent = choiceText;
+      btn.addEventListener("click", () => {
+        if (isLocked) return;
+        if (selected.has(index)) {
+          selected.delete(index);
+          btn.classList.remove("is-selected");
+        } else {
+          selected.add(index);
+          btn.classList.add("is-selected");
+        }
+      });
+      grid.appendChild(btn);
+    });
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.className = "btn btn-primary";
+    confirmBtn.textContent = "✅ けってい";
+    confirmBtn.addEventListener("click", () => {
+      if (isLocked) return;
+      const correctSet = new Set(stage.correctAnswers);
+      const isCorrect =
+        selected.size === correctSet.size &&
+        Array.from(selected).every((i) => correctSet.has(i));
+
+      if (isCorrect) {
+        Array.from(grid.children).forEach((c, i) => {
+          if (correctSet.has(i)) c.classList.add("is-correct");
+        });
+      } else {
+        Array.from(grid.children).forEach((c) => {
+          if (c.classList.contains("is-selected")) {
+            c.classList.add("is-wrong");
+            setTimeout(() => c.classList.remove("is-wrong"), 400);
+          }
+        });
+      }
+      handleResult(isCorrect, {
+        wrongMessage: "❌ おしい！もういちど えらんでみよう！",
+      });
+    });
+
+    container.appendChild(grid);
+    container.appendChild(confirmBtn);
   }
 
   /** type: "code-input" - キーボードで答えを入力する */
@@ -261,8 +335,10 @@
   }
 
   /**
-   * type: "order"（リッチ版） - {label, detail} のカードをリスト表示し、
-   * ▲▼ボタンで並べ替える。カードをタップすると detail をポップアップ表示する。
+   * type: "order"（リッチ版） - {label, detail, icon} のカードをリスト表示し、
+   * 持ち手（☰）を指でなぞって上下にスライドさせて並べ替える
+   * （Pointer Eventsを使った自前実装。外部ライブラリ不要）。
+   * カードの文字部分をタップすると detail をポップアップ表示する。
    * items は「正解の順番」で書かれている前提（correctOrderを省略した場合は
    * items のインデックス順 [0,1,2,...] がそのまま正解になる）。
    * 表示は必ずシャッフルした状態から始める。
@@ -287,6 +363,10 @@
       }
     }
 
+    const dragHint = document.createElement("p");
+    dragHint.className = "order-rich-draghint";
+    dragHint.textContent = "☰ を ゆびで なぞって、じゅんばんを いれかえよう";
+
     const listEl = document.createElement("div");
     listEl.className = "order-rich-list";
 
@@ -297,6 +377,66 @@
     detailText.className = "hint-text";
     detailPanel.appendChild(detailText);
 
+    /** handle(持ち手)のドラッグで pos番目のカードを並べ替える */
+    function attachDrag(handle, row, pos) {
+      handle.addEventListener("pointerdown", (e) => {
+        if (isLocked) return;
+        e.preventDefault();
+        const startY = e.clientY;
+        const rows = Array.from(listEl.children);
+        // ドラッグ中は他のカードの位置は動かさないので、開始時の位置を固定で使う
+        const startRects = rows.map((r) => r.getBoundingClientRect());
+        const draggedRect = startRects[pos];
+
+        row.classList.add("is-dragging");
+        try {
+          handle.setPointerCapture(e.pointerId);
+        } catch (err) {
+          /* setPointerCaptureが使えない環境でも致命的ではないため無視 */
+        }
+
+        function onMove(ev) {
+          const deltaY = ev.clientY - startY;
+          row.style.transform = `translateY(${deltaY}px)`;
+        }
+
+        function onUp(ev) {
+          handle.removeEventListener("pointermove", onMove);
+          handle.removeEventListener("pointerup", onUp);
+          handle.removeEventListener("pointercancel", onUp);
+          row.classList.remove("is-dragging");
+          row.style.transform = "";
+
+          const deltaY = ev.clientY - startY;
+          const draggedCenter = draggedRect.top + draggedRect.height / 2 + deltaY;
+
+          // 自分以外のカードを元の順番のまま並べ、draggedCenterがどこに
+          // 入るかを、各カードの中心Y座標との比較で決める。
+          const others = displayOrder.filter((_, idx) => idx !== pos);
+          let insertAt = others.length;
+          for (let idx = 0; idx < others.length; idx++) {
+            const originalPos = idx < pos ? idx : idx + 1;
+            const rect = startRects[originalPos];
+            const center = rect.top + rect.height / 2;
+            if (draggedCenter < center) {
+              insertAt = idx;
+              break;
+            }
+          }
+
+          const draggedValue = displayOrder[pos];
+          const newOrder = others.slice();
+          newOrder.splice(insertAt, 0, draggedValue);
+          displayOrder = newOrder;
+          renderList();
+        }
+
+        handle.addEventListener("pointermove", onMove);
+        handle.addEventListener("pointerup", onUp);
+        handle.addEventListener("pointercancel", onUp);
+      });
+    }
+
     function renderList() {
       listEl.innerHTML = "";
       displayOrder.forEach((originalIndex, pos) => {
@@ -304,6 +444,12 @@
 
         const row = document.createElement("div");
         row.className = "order-rich-item";
+
+        const handle = document.createElement("button");
+        handle.type = "button";
+        handle.className = "order-rich-handle";
+        handle.textContent = "☰";
+        handle.setAttribute("aria-label", "ならべかえる（なぞって動かす）");
 
         const labelBtn = document.createElement("button");
         labelBtn.type = "button";
@@ -328,44 +474,11 @@
           detailPanel.hidden = false;
         });
 
-        const controls = document.createElement("div");
-        controls.className = "order-rich-controls";
-
-        const upBtn = document.createElement("button");
-        upBtn.type = "button";
-        upBtn.className = "order-rich-btn";
-        upBtn.textContent = "▲";
-        upBtn.setAttribute("aria-label", "上へ");
-        upBtn.disabled = pos === 0;
-        upBtn.addEventListener("click", () => {
-          if (pos === 0) return;
-          [displayOrder[pos - 1], displayOrder[pos]] = [
-            displayOrder[pos],
-            displayOrder[pos - 1],
-          ];
-          renderList();
-        });
-
-        const downBtn = document.createElement("button");
-        downBtn.type = "button";
-        downBtn.className = "order-rich-btn";
-        downBtn.textContent = "▼";
-        downBtn.setAttribute("aria-label", "下へ");
-        downBtn.disabled = pos === displayOrder.length - 1;
-        downBtn.addEventListener("click", () => {
-          if (pos === displayOrder.length - 1) return;
-          [displayOrder[pos], displayOrder[pos + 1]] = [
-            displayOrder[pos + 1],
-            displayOrder[pos],
-          ];
-          renderList();
-        });
-
-        controls.appendChild(upBtn);
-        controls.appendChild(downBtn);
+        row.appendChild(handle);
         row.appendChild(labelBtn);
-        row.appendChild(controls);
         listEl.appendChild(row);
+
+        attachDrag(handle, row, pos);
       });
     }
 
@@ -383,6 +496,7 @@
       });
     });
 
+    container.appendChild(dragHint);
     container.appendChild(listEl);
     container.appendChild(detailPanel);
     container.appendChild(checkBtn);
