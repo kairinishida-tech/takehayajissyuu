@@ -42,6 +42,8 @@
   const btnHint = document.getElementById("btn-hint");
   const btnReveal = document.getElementById("btn-reveal");
   const btnRestart = document.getElementById("btn-restart");
+  const elapsedTimeEl = document.getElementById("elapsed-time");
+  const clearTimeEl = document.getElementById("clear-time");
 
   const progressFill = document.getElementById("progress-fill");
   const progressLabel = document.getElementById("progress-label");
@@ -66,6 +68,46 @@
   // ------------------------------------------------------------
   let currentStageIndex = 0;
   let isLocked = false; // 正解演出中などの二重タップ防止
+
+  // ------------------------------------------------------------
+  // クリアタイム計測（「はじめる」を押してから全ステージクリアまでの秒数）
+  // ------------------------------------------------------------
+  let gameStartTime = null;
+  let elapsedTimerId = null;
+
+  /** ミリ秒 → 「◯ふん◯びょう」のようなひらがな表記に整形する */
+  function formatElapsed(ms) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSec / 60);
+    const seconds = totalSec % 60;
+    if (minutes > 0) {
+      return `${minutes}ふん${String(seconds).padStart(2, "0")}びょう`;
+    }
+    return `${seconds}びょう`;
+  }
+
+  /** ステージ画面上部のストップウォッチ表示を更新する（m:ss の数字表記） */
+  function updateElapsedBadge() {
+    if (!elapsedTimeEl || gameStartTime === null) return;
+    const totalSec = Math.max(0, Math.floor((Date.now() - gameStartTime) / 1000));
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    elapsedTimeEl.textContent = `⏱ ${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function startGameTimer() {
+    gameStartTime = Date.now();
+    updateElapsedBadge();
+    if (elapsedTimerId) clearInterval(elapsedTimerId);
+    elapsedTimerId = setInterval(updateElapsedBadge, 1000);
+  }
+
+  function stopGameTimer() {
+    if (elapsedTimerId) {
+      clearInterval(elapsedTimerId);
+      elapsedTimerId = null;
+    }
+  }
 
   function saveProgress() {
     try {
@@ -1153,6 +1195,11 @@
   }
 
   function finishGame() {
+    stopGameTimer();
+    if (clearTimeEl) {
+      const elapsedMs = gameStartTime !== null ? Date.now() - gameStartTime : 0;
+      clearTimeEl.textContent = `🕒 クリアタイム：${formatElapsed(elapsedMs)}`;
+    }
     showScreen("clear");
     photoWrap.hidden = true;
     btnReveal.hidden = false;
@@ -1173,6 +1220,8 @@
       stopConfetti();
       stopConfetti = null;
     }
+    stopGameTimer();
+    gameStartTime = null;
     currentStageIndex = 0;
     saveProgress();
     showScreen("title");
@@ -1182,6 +1231,7 @@
   // イベント登録
   // ------------------------------------------------------------
   btnStart.addEventListener("click", () => {
+    startGameTimer();
     loadStage(0);
   });
   btnHint.addEventListener("click", showHint);

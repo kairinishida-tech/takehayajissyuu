@@ -7,9 +7,12 @@
 --------------------------------------------------------------- */
 
 :root {
-  --color-bg-1: #6f7bf7;
-  --color-bg-2: #9f6ff5;
-  --color-bg-3: #ff8ac6;
+  /* 夜の街に かいじゅうが せまる雰囲気の配色（暗い夜空〜放射能グリーン） */
+  --color-bg-1: #0f2027;
+  --color-bg-2: #16324f;
+  --color-bg-3: #1b4332;
+  --color-kaiju-glow: #39ff14;
+  --color-kaiju-glow-dim: rgba(57, 255, 20, 0.35);
   --color-primary: #ff8a3d;
   --color-primary-dark: #e56e1f;
   --color-secondary: #4dc3a3;
@@ -22,7 +25,7 @@
   --radius-lg: 26px;
   --radius-md: 16px;
   --tap-min: 44px;
-  --accent-gradient: linear-gradient(90deg, #ff8a3d, #ffd166, #4dc3a3, #6f7bf7, #ff8ac6);
+  --accent-gradient: linear-gradient(90deg, #39ff14, #ffd166, #ff5a3d, #39ff14);
 }
 
 * {
@@ -62,7 +65,28 @@ body {
   50% { background-position: 100% 100%; }
 }
 
-/* 背景を漂う装飾（鍵・きらきら等）。操作には一切干渉しない */
+/* 非常灯のように、ときどき放射能グリーンがふわっと光る警戒演出 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 15%, var(--color-kaiju-glow-dim), transparent 60%);
+  opacity: 0;
+  animation: alert-pulse 7s ease-in-out infinite;
+}
+
+@keyframes alert-pulse {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; opacity: 0.3; }
+}
+
+/* 背景を漂う装飾（かいじゅう・炎・稲光等）。操作には一切干渉しない */
 .bg-decor {
   position: fixed;
   inset: 0;
@@ -79,7 +103,7 @@ body {
   opacity: 0.22;
   animation: bg-float var(--dur) ease-in-out infinite;
   animation-delay: var(--delay);
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.12));
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
 }
 
 @keyframes bg-float {
@@ -89,9 +113,39 @@ body {
   75% { transform: translate(-10px, -10px) rotate(-4deg); }
 }
 
+/* 画面いちばん下に敷く、まちのシルエット */
+.city-skyline {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 12vh;
+  min-height: 70px;
+  max-height: 140px;
+  pointer-events: none;
+  z-index: -1;
+  fill: rgba(5, 10, 15, 0.55);
+}
+
+.city-skyline .city-window {
+  fill: #ffe066;
+  opacity: 0.85;
+  animation: window-flicker 3.4s ease-in-out infinite;
+}
+
+.city-skyline .city-window:nth-child(3n) { animation-delay: -1s; }
+.city-skyline .city-window:nth-child(3n+1) { animation-delay: -2.2s; }
+
+@keyframes window-flicker {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 0.25; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   body { animation: none; }
   .bg-decor-item { animation: none; }
+  .city-skyline .city-window { animation: none; }
 }
 
 input, textarea {
@@ -189,25 +243,32 @@ button {
 
 .title-icon {
   display: inline-block;
-  animation: title-icon-bounce 2.4s ease-in-out infinite;
-  animation-delay: var(--spin-delay, 0s);
 }
 
-.title-icon-key {
-  animation-name: title-icon-jiggle;
+.title-icon-kaiju {
+  animation: title-icon-roar 2.6s ease-in-out infinite;
+  transform-origin: 70% 100%;
+  filter: drop-shadow(0 0 10px var(--color-kaiju-glow-dim));
 }
 
-@keyframes title-icon-bounce {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-8px) rotate(-6deg); }
+.title-icon-city {
+  animation: title-icon-tremble 2.6s ease-in-out infinite;
 }
 
-@keyframes title-icon-jiggle {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  10% { transform: rotate(-18deg) scale(1.05); }
-  20% { transform: rotate(14deg) scale(1.05); }
-  30% { transform: rotate(-8deg) scale(1); }
-  40%, 100% { transform: rotate(0deg) scale(1); }
+@keyframes title-icon-roar {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  15% { transform: scale(1.12) rotate(-6deg); }
+  30% { transform: scale(1.18) rotate(4deg); }
+  45% { transform: scale(1.05) rotate(-2deg); }
+  60%, 100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes title-icon-tremble {
+  0%, 28%, 100% { transform: translate(0, 0) rotate(0deg); }
+  30% { transform: translate(-2px, 1px) rotate(-2deg); }
+  33% { transform: translate(2px, -1px) rotate(2deg); }
+  36% { transform: translate(-1px, 1px) rotate(-1deg); }
+  39% { transform: translate(0, 0) rotate(0deg); }
 }
 
 .app-title {
@@ -225,7 +286,7 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .title-icon, .title-icon-key { animation: none; }
+  .title-icon-kaiju, .title-icon-city { animation: none; }
 }
 
 .app-sub {
@@ -320,7 +381,8 @@ button {
 .progress-wrap {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   padding: 8px 16px;
@@ -350,21 +412,22 @@ button {
 }
 
 .progress-dot.is-done {
-  background: var(--color-secondary);
-  border-color: var(--color-secondary-dark);
+  background: var(--color-primary);
+  border-color: var(--color-primary-dark);
   opacity: 1;
 }
 
 .progress-dot.is-current {
   background: #fff;
-  border-color: var(--color-primary);
+  border-color: var(--color-kaiju-glow);
   opacity: 1;
   transform: scale(1.2);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 4px var(--color-kaiju-glow-dim), 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .progress-track {
   flex: 1;
+  min-width: 90px;
   height: 14px;
   background: rgba(0, 0, 0, 0.1);
   border-radius: 999px;
@@ -382,6 +445,18 @@ button {
 .progress-label {
   font-weight: 700;
   color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* 計測中のけいか時間バッジ（脱出までの緊張感を出すストップウォッチ） */
+.elapsed-time {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #0f2027;
+  background: var(--color-kaiju-glow-dim);
+  border: 2px solid var(--color-kaiju-glow);
+  border-radius: 999px;
+  padding: 2px 12px;
   white-space: nowrap;
 }
 
@@ -482,9 +557,9 @@ button {
 
 /* 複数選択クイズ(multiSelect)で選んでいる選択肢 */
 .choice-btn.is-selected {
-  background: rgba(111, 123, 247, 0.18);
-  border-color: var(--color-bg-1);
-  box-shadow: inset 0 0 0 2px rgba(111, 123, 247, 0.3);
+  background: rgba(57, 255, 20, 0.14);
+  border-color: #2bb30f;
+  box-shadow: inset 0 0 0 2px var(--color-kaiju-glow-dim);
 }
 
 /* code-input用 */
@@ -681,8 +756,8 @@ button {
 }
 
 .bj-card-back {
-  background: var(--color-bg-1);
-  border-color: #5a63d8;
+  background: #163a2e;
+  border-color: var(--color-kaiju-glow);
   color: #fff;
 }
 
@@ -901,6 +976,19 @@ button {
   margin: 0;
   color: var(--color-text-sub);
   font-size: clamp(1rem, 2.6vw, 1.2rem);
+}
+
+.clear-time {
+  margin: 0;
+  display: inline-block;
+  font-weight: 800;
+  font-size: clamp(1.05rem, 3vw, 1.3rem);
+  color: #0f2027;
+  background: var(--color-kaiju-glow-dim);
+  border: 2px solid var(--color-kaiju-glow);
+  border-radius: 999px;
+  padding: 8px 20px;
+  animation: pop-in 0.4s ease;
 }
 
 .photo-wrap {
