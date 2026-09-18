@@ -7,16 +7,19 @@
 --------------------------------------------------------------- */
 
 :root {
-  /* 夜の街に かいじゅうが せまる雰囲気の配色（暗い夜空〜放射能グリーン） */
-  --color-bg-1: #0f2027;
-  --color-bg-2: #16324f;
-  --color-bg-3: #1b4332;
-  --color-kaiju-glow: #39ff14;
-  --color-kaiju-glow-dim: rgba(57, 255, 20, 0.35);
-  --color-primary: #ff8a3d;
-  --color-primary-dark: #e56e1f;
-  --color-secondary: #4dc3a3;
-  --color-secondary-dark: #33a184;
+  /* もらった「感謝」ポスター（濃紺の背景・力強い赤の筆文字・白フチのコラージュ・
+     あたたかい肌色のハイライト）の雰囲気に合わせた配色 */
+  --color-bg-1: #10162a;
+  --color-bg-2: #171f3a;
+  --color-bg-3: #1c2440;
+  --color-kaiju-glow: #7fae3f;
+  --color-kaiju-glow-dim: rgba(127, 174, 63, 0.3);
+  --color-primary: #d8281c;
+  --color-primary-dark: #9c1c12;
+  --color-secondary: #e0982a;
+  --color-secondary-dark: #b8791a;
+  --color-glow: #f5b731;
+  --color-glow-dim: rgba(245, 183, 49, 0.35);
   --color-correct: #35c165;
   --color-wrong: #ff5a5f;
   --color-card-bg: #ffffff;
@@ -25,7 +28,7 @@
   --radius-lg: 26px;
   --radius-md: 16px;
   --tap-min: 44px;
-  --accent-gradient: linear-gradient(90deg, #39ff14, #ffd166, #ff5a3d, #39ff14);
+  --accent-gradient: linear-gradient(90deg, #d8281c, #f5b731, #d8281c);
 }
 
 * {
@@ -65,14 +68,14 @@ body {
   50% { background-position: 100% 100%; }
 }
 
-/* 非常灯のように、ときどき放射能グリーンがふわっと光る警戒演出 */
+/* 非常灯のように、ときどき あたたかい光がふわっと差し込む警戒演出 */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 15%, var(--color-kaiju-glow-dim), transparent 60%);
+  background: radial-gradient(circle at 50% 15%, var(--color-glow-dim), transparent 60%);
   opacity: 0;
   animation: alert-pulse 7s ease-in-out infinite;
 }
@@ -84,6 +87,23 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   body::before { animation: none; opacity: 0.3; }
+}
+
+/* ポスターの「感謝」上部にある、赤い筆あとの帯を模した装飾 */
+.paint-stroke {
+  position: fixed;
+  top: 4%;
+  left: -5%;
+  width: 110%;
+  height: 3.2vh;
+  min-height: 14px;
+  max-height: 26px;
+  background: linear-gradient(90deg, transparent, var(--color-primary) 12%, var(--color-primary) 88%, transparent);
+  opacity: 0.55;
+  transform: rotate(-1.2deg);
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(0.5px);
 }
 
 /* 背景を漂う装飾（かいじゅう・炎・稲光等）。操作には一切干渉しない */
@@ -190,10 +210,12 @@ button {
   position: relative;
   background: var(--color-card-bg);
   border-radius: var(--radius-lg);
+  /* 白フチのコラージュ写真を貼りつけたような、くっきりした縁取り＋落ち影 */
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.6) inset,
-    0 24px 50px rgba(35, 20, 80, 0.28),
-    0 4px 12px rgba(35, 20, 80, 0.12);
+    0 0 0 6px #fff,
+    0 0 0 8px rgba(0, 0, 0, 0.12),
+    10px 12px 0 rgba(0, 0, 0, 0.22),
+    0 24px 50px rgba(10, 10, 25, 0.35);
   padding: 34px 24px 28px;
   width: 100%;
   max-width: 640px;
@@ -230,6 +252,7 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 20px;
+  transform: rotate(-0.6deg);
 }
 
 .title-icon-row {
@@ -272,28 +295,48 @@ button {
 }
 
 .app-title {
-  font-size: clamp(2rem, 6vw, 2.9rem);
+  font-size: clamp(2.1rem, 6.4vw, 3rem);
   margin: 0;
   line-height: 1.3;
   font-weight: 900;
-  letter-spacing: 0.02em;
-  background: var(--accent-gradient);
-  background-size: 300% 100%;
-  animation: accent-flow 6s linear infinite;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  transform: rotate(-1deg);
+  /* もらった「感謝」の筆文字のように、白フチ＋影をつけた見出し */
+  text-shadow:
+    2px 0 0 #fff, -2px 0 0 #fff, 0 2px 0 #fff, 0 -2px 0 #fff,
+    2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff,
+    4px 5px 0 rgba(0, 0, 0, 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .title-icon-kaiju, .title-icon-city { animation: none; }
 }
 
+/* ポスターの「ありがとう！」吹き出しを模した、コミック風の speech bubble */
 .app-sub {
-  margin: 0;
-  font-size: clamp(1rem, 2.6vw, 1.2rem);
-  color: var(--color-text-sub);
-  font-weight: 600;
+  position: relative;
+  margin: 6px 0 14px;
+  padding: 12px 20px;
+  font-size: clamp(0.95rem, 2.4vw, 1.1rem);
+  font-weight: 700;
+  color: var(--color-text);
+  background: #fff;
+  border: 3px solid #1c1c24;
+  border-radius: 18px;
+}
+
+.app-sub::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -13px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-right: 3px solid #1c1c24;
+  border-bottom: 3px solid #1c1c24;
+  transform: translateX(-50%) rotate(45deg);
 }
 
 /* ---------- 共通ボタン ---------- */
@@ -412,17 +455,17 @@ button {
 }
 
 .progress-dot.is-done {
-  background: var(--color-primary);
-  border-color: var(--color-primary-dark);
+  background: var(--color-secondary);
+  border-color: var(--color-secondary-dark);
   opacity: 1;
 }
 
 .progress-dot.is-current {
   background: #fff;
-  border-color: var(--color-kaiju-glow);
+  border-color: var(--color-primary);
   opacity: 1;
   transform: scale(1.2);
-  box-shadow: 0 0 0 4px var(--color-kaiju-glow-dim), 0 4px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 4px rgba(216, 40, 28, 0.28), 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .progress-track {
@@ -452,9 +495,9 @@ button {
 .elapsed-time {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #0f2027;
-  background: var(--color-kaiju-glow-dim);
-  border: 2px solid var(--color-kaiju-glow);
+  color: #6a4400;
+  background: var(--color-glow-dim);
+  border: 2px solid var(--color-glow);
   border-radius: 999px;
   padding: 2px 12px;
   white-space: nowrap;
@@ -557,9 +600,9 @@ button {
 
 /* 複数選択クイズ(multiSelect)で選んでいる選択肢 */
 .choice-btn.is-selected {
-  background: rgba(57, 255, 20, 0.14);
-  border-color: #2bb30f;
-  box-shadow: inset 0 0 0 2px var(--color-kaiju-glow-dim);
+  background: rgba(245, 183, 49, 0.2);
+  border-color: var(--color-glow);
+  box-shadow: inset 0 0 0 2px var(--color-glow-dim);
 }
 
 /* code-input用 */
@@ -942,6 +985,7 @@ button {
   gap: 20px;
   position: relative;
   z-index: 2;
+  transform: rotate(0.5deg);
 }
 
 .clear-trophy {
@@ -962,14 +1006,15 @@ button {
 
 .clear-title {
   margin: 0;
-  font-size: clamp(1.8rem, 5.5vw, 2.6rem);
+  font-size: clamp(1.9rem, 5.8vw, 2.7rem);
   font-weight: 900;
-  background: var(--accent-gradient);
-  background-size: 300% 100%;
-  animation: accent-flow 6s linear infinite, pop-in 0.5s ease;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  letter-spacing: 0.03em;
+  color: var(--color-primary);
+  animation: pop-in 0.5s ease;
+  text-shadow:
+    2px 0 0 #fff, -2px 0 0 #fff, 0 2px 0 #fff, 0 -2px 0 #fff,
+    2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff,
+    4px 5px 0 rgba(0, 0, 0, 0.2);
 }
 
 .clear-sub {
@@ -983,9 +1028,9 @@ button {
   display: inline-block;
   font-weight: 800;
   font-size: clamp(1.05rem, 3vw, 1.3rem);
-  color: #0f2027;
-  background: var(--color-kaiju-glow-dim);
-  border: 2px solid var(--color-kaiju-glow);
+  color: #6a4400;
+  background: var(--color-glow-dim);
+  border: 2px solid var(--color-glow);
   border-radius: 999px;
   padding: 8px 20px;
   animation: pop-in 0.4s ease;
