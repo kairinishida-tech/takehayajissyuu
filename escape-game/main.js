@@ -54,6 +54,8 @@
     correct() {},
     wrong() {},
     gameStart() {},
+    startAmbient() {},
+    stopAmbient() {},
     advance() {},
     cardDeal() {},
     win() {},
@@ -80,6 +82,8 @@
   const feedbackEl = document.getElementById("feedback");
   const hintPanel = document.getElementById("hint-panel");
   const hintText = document.getElementById("hint-text");
+
+  const roarFlashEl = document.getElementById("roar-flash");
 
   const photoWrap = document.getElementById("photo-wrap");
   const finalPhotoEl = document.getElementById("final-photo");
@@ -1246,6 +1250,7 @@
   }
 
   function finishGame() {
+    SFX.stopAmbient();
     SFX.fanfare();
     stopGameTimer();
     if (clearTimeEl) {
@@ -1270,6 +1275,7 @@
 
   function restartGame() {
     SFX.tap();
+    SFX.stopAmbient();
     if (stopConfetti) {
       stopConfetti();
       stopConfetti = null;
@@ -1284,6 +1290,27 @@
   // ------------------------------------------------------------
   // イベント登録
   // ------------------------------------------------------------
+  // 「かいじゅうの鼓動/咆哮」に合わせて、画面をわずかに揺らしたり赤くフラッシュ
+  // させたりする（sfx.js側から window にイベントとして通知される）
+  const reduceMotion =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  window.addEventListener("sfx-heartbeat", () => {
+    if (reduceMotion) return;
+    const activeCard = document.querySelector(".screen.is-active .card");
+    if (!activeCard) return;
+    activeCard.classList.remove("is-tremor");
+    void activeCard.offsetWidth; // アニメーションを毎回リスタートさせるための強制リフロー
+    activeCard.classList.add("is-tremor");
+  });
+
+  window.addEventListener("sfx-roar", () => {
+    if (reduceMotion || !roarFlashEl) return;
+    roarFlashEl.classList.remove("is-active");
+    void roarFlashEl.offsetWidth;
+    roarFlashEl.classList.add("is-active");
+  });
+
   // iPad Safari は「音を鳴らすには先にユーザー操作が必要」という制約があるため、
   // 画面のどこでも最初の1回タップされた時点でAudioContextをアンロックしておく
   document.addEventListener(
@@ -1314,6 +1341,8 @@
     SFX.gameStart();
     startGameTimer();
     loadStage(0);
+    // 予告編風の演出(gameStart)が終わるころにアンビエントの鼓動を始める
+    setTimeout(() => SFX.startAmbient(), 1600);
   });
   btnHint.addEventListener("click", showHint);
   btnReveal.addEventListener("click", revealPhoto);

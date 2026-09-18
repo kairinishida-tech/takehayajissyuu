@@ -65,10 +65,10 @@
     osc.stop(t0 + duration + release + 0.02);
   }
 
-  /** notes配列を順番に鳴らす（メロディ・ファンファーレ等） */
-  function sequence(notes) {
+  /** notes配列を順番に鳴らす（メロディ・ファンファーレ等）。offsetで開始タイミングをずらせる */
+  function sequence(notes, offset) {
     if (muted) return;
-    let t = 0;
+    let t = offset || 0;
     notes.forEach((note) => {
       tone(Object.assign({}, note, { startTime: t }));
       t += note.gap !== undefined ? note.gap : note.duration || 0.15;
@@ -104,6 +104,89 @@
     gain.connect(c.destination);
     noise.start(t0);
     noise.stop(t0 + duration + 0.02);
+  }
+
+  /**
+   * かいじゅうの「うなり声」。低音のビブラート付きサウトゥース波＋
+   * ローパスノイズを重ねて、地鳴りのような唸りを表現する。
+   * ゲーム開始の演出や、ステージ中にたまに鳴る「遠くの咆哮」に使う。
+   * 鳴るたびに 'sfx-roar' イベントを発火し、画面の赤いフラッシュ演出と連動させる。
+   */
+  function growl(opts) {
+    const { startTime = 0, duration = 0.9, volume = 0.2 } = opts || {};
+
+    try {
+      window.dispatchEvent(new CustomEvent("sfx-roar"));
+    } catch (e) {
+      /* CustomEventが使えない古い環境でも致命的ではないため無視 */
+    }
+
+    if (muted) return;
+    const c = getContext();
+    if (!c) return;
+    const t0 = c.currentTime + startTime;
+
+    const osc = c.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(85, t0);
+    osc.frequency.linearRampToValueAtTime(45, t0 + duration);
+
+    // ビブラートで機械的すぎない「唸り」に近づける
+    const vibrato = c.createOscillator();
+    vibrato.frequency.value = 7;
+    const vibratoGain = c.createGain();
+    vibratoGain.gain.value = 12;
+    vibrato.connect(vibratoGain);
+    vibratoGain.connect(osc.frequency);
+
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(volume, t0 + 0.15);
+    gain.gain.linearRampToValueAtTime(volume * 0.7, t0 + duration * 0.6);
+    gain.gain.linearRampToValueAtTime(0, t0 + duration);
+
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start(t0);
+    vibrato.start(t0);
+    osc.stop(t0 + duration + 0.05);
+    vibrato.stop(t0 + duration + 0.05);
+
+    noiseBurst({ startTime, duration, volume: volume * 0.5, filterFreq: 500 });
+  }
+
+  // ------------------------------------------------------------
+  // アンビエント演出（ステージ中に流す「心臓の鼓動」「遠くの咆哮」）。
+  // どちらも低音・低音量のごく控えめな演出で、通常の効果音の邪魔をしない。
+  // ------------------------------------------------------------
+  let ambientRunning = false;
+  let heartbeatTimer = null;
+  let roarTimer = null;
+
+  /** 低い二連の鼓動音。鳴るたびに 'sfx-heartbeat' を発火し、画面の小さな揺れと連動させる */
+  function heartbeatThump() {
+    try {
+      window.dispatchEvent(new CustomEvent("sfx-heartbeat"));
+    } catch (e) {
+      /* 無視 */
+    }
+    tone({ freq: 58, duration: 0.12, type: "sine", volume: 0.1, attack: 0.008, release: 0.05 });
+    tone({ freq: 46, duration: 0.14, type: "sine", volume: 0.08, startTime: 0.16, attack: 0.008, release: 0.06 });
+  }
+
+  function scheduleHeartbeat() {
+    if (!ambientRunning) return;
+    heartbeatThump();
+    heartbeatTimer = setTimeout(scheduleHeartbeat, 1600 + Math.random() * 500);
+  }
+
+  function scheduleRoar() {
+    if (!ambientRunning) return;
+    roarTimer = setTimeout(() => {
+      if (!ambientRunning) return;
+      growl({ duration: 1.1, volume: 0.13 });
+      scheduleRoar();
+    }, 13000 + Math.random() * 9000);
   }
 
   const SFX = {
@@ -152,15 +235,40 @@
     /** 不正解（ステージ共通のフィードバック） */
     wrong() {
       tone({ freq: 220, freqEnd: 140, duration: 0.22, type: "sawtooth", volume: 0.14 });
+      noiseBurst({ duration: 0.12, volume: 0.09, filterFreq: 500, startTime: 0.02 });
     },
 
-    /** タイトル画面「はじめる」を押したとき。かいじゅうが近づいてくるような低い音 */
+    /**
+     * タイトル画面「はじめる」を押したとき。地鳴り→かいじゅうの咆哮→
+     * 緊張感が高まる上昇音、という「怪獣映画の予告編」風の3段構成。
+     */
     gameStart() {
-      sequence([
-        { freq: 90, duration: 0.16, type: "sawtooth", volume: 0.15 },
-        { freq: 140, duration: 0.14, type: "sawtooth", volume: 0.15 },
-        { freq: 80, duration: 0.26, type: "sawtooth", volume: 0.18 },
-      ]);
+      tone({ freq: 55, duration: 0.5, type: "sawtooth", volume: 0.17 });
+      growl({ startTime: 0.15, duration: 1.1, volume: 0.24 });
+      sequence(
+        [
+          { freq: 100, freqEnd: 200, duration: 0.35, type: "sawtooth", volume: 0.14 },
+          { freq: 100, freqEnd: 340, duration: 0.45, type: "sawtooth", volume: 0.16 },
+        ],
+        1.2
+      );
+    },
+
+    /** ステージ中に流す、心臓の鼓動と遠くの咆哮のアンビエント演出を開始する */
+    startAmbient() {
+      if (ambientRunning) return;
+      ambientRunning = true;
+      scheduleHeartbeat();
+      scheduleRoar();
+    },
+
+    /** アンビエント演出を止める（クリア画面・タイトルに戻るときに呼ぶ） */
+    stopAmbient() {
+      ambientRunning = false;
+      if (heartbeatTimer) clearTimeout(heartbeatTimer);
+      if (roarTimer) clearTimeout(roarTimer);
+      heartbeatTimer = null;
+      roarTimer = null;
     },
 
     /** ステージが切り替わるときの短い上昇音 */
@@ -211,16 +319,20 @@
       tone({ freq: 300, duration: 0.06, type: "square", volume: 0.09 });
     },
 
-    /** 全ステージクリア時のファンファーレ */
+    /** 全ステージクリア時。かいじゅうを振り切った雄叫び→ファンファーレの2段構成 */
     fanfare() {
-      sequence([
-        { freq: 523.25, duration: 0.12, type: "triangle", volume: 0.18 },
-        { freq: 659.25, duration: 0.12, type: "triangle", volume: 0.18 },
-        { freq: 784.0, duration: 0.12, type: "triangle", volume: 0.18 },
-        { freq: 1046.5, duration: 0.12, type: "triangle", volume: 0.2 },
-        { freq: 784.0, duration: 0.1, type: "triangle", volume: 0.16, gap: 0.16 },
-        { freq: 1046.5, duration: 0.32, type: "triangle", volume: 0.22 },
-      ]);
+      growl({ duration: 0.55, volume: 0.16 });
+      sequence(
+        [
+          { freq: 523.25, duration: 0.12, type: "triangle", volume: 0.18 },
+          { freq: 659.25, duration: 0.12, type: "triangle", volume: 0.18 },
+          { freq: 784.0, duration: 0.12, type: "triangle", volume: 0.18 },
+          { freq: 1046.5, duration: 0.12, type: "triangle", volume: 0.2 },
+          { freq: 784.0, duration: 0.1, type: "triangle", volume: 0.16, gap: 0.16 },
+          { freq: 1046.5, duration: 0.32, type: "triangle", volume: 0.22 },
+        ],
+        0.6
+      );
     },
 
     /** ごほうび写真を開いたときのきらきら音 */

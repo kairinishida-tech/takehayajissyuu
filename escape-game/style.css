@@ -187,10 +187,82 @@ body::before {
   50% { opacity: 0.25; }
 }
 
+/* かいじゅうが咆哮したときに、画面ぜんたいをうっすら赤く光らせるフラッシュ演出 */
+.roar-flash {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 38%, rgba(216, 40, 28, 0.4), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.roar-flash.is-active {
+  animation: roar-flash-anim 0.9s ease-out;
+}
+
+@keyframes roar-flash-anim {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 画面のすみで交互に明滅する、警戒サイレンのような赤い光 */
+.kaiju-alert {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.kaiju-alert::before,
+.kaiju-alert::after {
+  content: "";
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(216, 40, 28, 0.32), transparent 65%);
+  opacity: 0;
+  animation: siren-pulse 3.6s ease-in-out infinite;
+}
+
+.kaiju-alert::before {
+  top: -22vmax;
+  left: -22vmax;
+}
+
+.kaiju-alert::after {
+  bottom: -22vmax;
+  right: -22vmax;
+  animation-delay: 1.8s;
+}
+
+@keyframes siren-pulse {
+  0%, 100% { opacity: 0; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* かいじゅうの鼓動に合わせて、いま表示中のカードをわずかに揺らす演出 */
+.is-tremor {
+  animation: kaiju-tremor 0.25s ease;
+}
+
+@keyframes kaiju-tremor {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, 1px); }
+  50% { transform: translate(2px, -1px); }
+  75% { transform: translate(-1px, 2px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   body { animation: none; }
   .bg-decor-item { animation: none; }
   .city-skyline .city-window { animation: none; }
+  .kaiju-alert::before, .kaiju-alert::after { animation: none; opacity: 0.12; }
+  .roar-flash.is-active { animation: none; opacity: 0; }
+  .is-tremor { animation: none; }
 }
 
 input, textarea {

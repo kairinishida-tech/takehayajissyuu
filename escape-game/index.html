@@ -4,12 +4,18 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>だっしゅつゲーム</title>
-<link rel="stylesheet" href="style.css?v=4" />
+<link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
 
   <!-- 効果音のON/OFF切り替え（教室で複数台同時に使うことを想定した控えめな配置） -->
   <button id="btn-mute" class="btn-mute" type="button" aria-label="おとの ON/OFF">🔊</button>
+
+  <!-- かいじゅうが放つ「咆哮」に合わせて、画面ぜんたいをうっすら赤く光らせる演出 -->
+  <div id="roar-flash" class="roar-flash" aria-hidden="true"></div>
+
+  <!-- 画面のすみで明滅する、警戒サイレンのような赤い光の演出 -->
+  <div class="kaiju-alert" aria-hidden="true"></div>
 
   <!-- もらった「感謝」ポスターの、上部にある赤い筆あとを模した装飾 -->
   <div class="paint-stroke" aria-hidden="true"></div>
@@ -132,8 +138,8 @@
     </div>
   </section>
 
-  <script src="stages.js?v=4"></script>
-  <script src="sfx.js?v=4"></script>
-  <script src="main.js?v=4"></script>
+  <script src="stages.js?v=5"></script>
+  <script src="sfx.js?v=5"></script>
+  <script src="main.js?v=5"></script>
 </body>
 </html>
