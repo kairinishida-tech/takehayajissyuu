@@ -89,6 +89,31 @@ body::before {
   body::before { animation: none; opacity: 0.3; }
 }
 
+/* 効果音のON/OFFボタン（教室で同時に何台も使うことを想定し、控えめな見た目・
+   隅の固定配置にしてある） */
+.btn-mute {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  z-index: 20;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(16, 22, 42, 0.55);
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.btn-mute:active {
+  transform: scale(0.92);
+  background: rgba(16, 22, 42, 0.75);
+}
+
 /* ポスターの「感謝」上部にある、赤い筆あとの帯を模した装飾 */
 .paint-stroke {
   position: fixed;

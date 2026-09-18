@@ -42,6 +42,29 @@
   const btnHint = document.getElementById("btn-hint");
   const btnReveal = document.getElementById("btn-reveal");
   const btnRestart = document.getElementById("btn-restart");
+  const btnMute = document.getElementById("btn-mute");
+
+  // window.SFX が読み込まれていない環境でも落ちないよう、空の代替オブジェクトを用意
+  const SFX = window.SFX || {
+    unlock() {},
+    isMuted() { return false; },
+    toggleMuted() { return false; },
+    tap() {},
+    hint() {},
+    correct() {},
+    wrong() {},
+    gameStart() {},
+    advance() {},
+    cardDeal() {},
+    win() {},
+    lose() {},
+    catchFish() {},
+    bite() {},
+    pickup() {},
+    drop() {},
+    fanfare() {},
+    reveal() {},
+  };
   const elapsedTimeEl = document.getElementById("elapsed-time");
   const clearTimeEl = document.getElementById("clear-time");
 
@@ -182,6 +205,7 @@
       btn.textContent = choiceText;
       btn.addEventListener("click", () => {
         if (isLocked) return;
+        SFX.tap();
         const isCorrect = index === stage.answerIndex;
         if (isCorrect) {
           btn.classList.add("is-correct");
@@ -215,6 +239,7 @@
       btn.textContent = choiceText;
       btn.addEventListener("click", () => {
         if (isLocked) return;
+        SFX.tap();
         if (selected.has(index)) {
           selected.delete(index);
           btn.classList.remove("is-selected");
@@ -232,6 +257,7 @@
     confirmBtn.textContent = "✅ けってい";
     confirmBtn.addEventListener("click", () => {
       if (isLocked) return;
+      SFX.tap();
       const correctSet = new Set(stage.correctAnswers);
       const isCorrect =
         selected.size === correctSet.size &&
@@ -279,6 +305,7 @@
 
     function submit() {
       if (isLocked) return;
+      SFX.tap();
       const isCorrect = normalizeAnswer(input.value) === normalizeAnswer(stage.answer);
       if (isCorrect) {
         input.classList.remove("is-wrong");
@@ -345,6 +372,7 @@
       piece.textContent = label;
       piece.addEventListener("click", () => {
         if (isLocked || piece.classList.contains("is-picked")) return;
+        SFX.tap();
         piece.classList.add("is-picked");
         pickedOrder.push(index);
         answerRow.children[pickedOrder.length - 1].textContent = label;
@@ -426,6 +454,7 @@
       handle.addEventListener("pointerdown", (e) => {
         if (isLocked) return;
         e.preventDefault();
+        SFX.pickup();
         const startY = e.clientY;
         const rows = Array.from(listEl.children);
         // ドラッグ中は他のカードの位置は動かさないので、開始時の位置を固定で使う
@@ -450,6 +479,7 @@
           handle.removeEventListener("pointercancel", onUp);
           row.classList.remove("is-dragging");
           row.style.transform = "";
+          SFX.drop();
 
           const deltaY = ev.clientY - startY;
           const draggedCenter = draggedRect.top + draggedRect.height / 2 + deltaY;
@@ -514,6 +544,7 @@
 
         labelBtn.addEventListener("click", () => {
           if (!item.detail) return;
+          SFX.tap();
           detailText.textContent = (item.icon ? item.icon + " " : "") + item.detail;
           detailPanel.hidden = false;
         });
@@ -534,6 +565,7 @@
     checkBtn.textContent = "✅ これでかくにん";
     checkBtn.addEventListener("click", () => {
       if (isLocked) return;
+      SFX.tap();
       const isCorrect = displayOrder.every((v, i) => v === correctOrder[i]);
       handleResult(isCorrect, {
         wrongMessage: "❌ ここが ちがうかも…もういちど ならべかえてみよう！",
@@ -664,11 +696,21 @@
       resultEl.innerHTML = "";
       setActionsEnabled(true);
       renderHands();
+      SFX.cardDeal();
+      setTimeout(() => SFX.cardDeal(), 120);
+      setTimeout(() => SFX.cardDeal(), 240);
+      setTimeout(() => SFX.cardDeal(), 360);
     }
 
     function endRound(playerWon, message) {
       phase = "done";
       setActionsEnabled(false);
+
+      if (playerWon) {
+        SFX.win();
+      } else {
+        SFX.lose();
+      }
 
       const msg = document.createElement("p");
       msg.className = "bj-result-text " + (playerWon ? "is-correct" : "is-wrong");
@@ -716,6 +758,7 @@
       function step() {
         if (total(cpuCards) < rules.dealerStandsAt) {
           cpuCards.push(randInt(rules.cardMin, rules.cardMax));
+          SFX.cardDeal();
           renderHands();
           setTimeout(step, 400);
           return;
@@ -733,6 +776,7 @@
 
     hitBtn.addEventListener("click", () => {
       if (phase !== "player") return;
+      SFX.cardDeal();
       playerCards.push(randInt(rules.cardMin, rules.cardMax));
       renderHands();
       if (total(playerCards) > rules.maxTotal) {
@@ -742,6 +786,7 @@
 
     standBtn.addEventListener("click", () => {
       if (phase !== "player") return;
+      SFX.tap();
       cpuTurn();
     });
 
@@ -893,6 +938,7 @@
         if (record.el.parentNode) record.el.parentNode.removeChild(record.el);
       }, 350);
 
+      SFX.catchFish();
       caught += 1;
       updateStatus();
 
@@ -924,6 +970,7 @@
 
     function failGame() {
       stopLoops();
+      SFX.bite();
       biteOverlay.hidden = false;
       if (navigator.vibrate) {
         try {
@@ -1069,6 +1116,7 @@
 
   /** 次のステージへ進む（すべて終わっていればクリア画面へ） */
   function advanceStage() {
+    SFX.advance();
     loadStage(currentStageIndex + 1);
   }
 
@@ -1076,18 +1124,21 @@
     const opts = options || {};
     if (isCorrect) {
       isLocked = true;
+      SFX.correct();
       feedbackEl.textContent = opts.correctMessage || "🎉 せいかい！";
       feedbackEl.className = "feedback is-correct";
       setTimeout(() => {
         advanceStage();
       }, 900);
     } else {
+      SFX.wrong();
       feedbackEl.textContent = opts.wrongMessage || "❌ ざんねん、もういちど ちょうせん！";
       feedbackEl.className = "feedback is-wrong";
     }
   }
 
   function showHint() {
+    SFX.hint();
     hintPanel.hidden = !hintPanel.hidden;
   }
 
@@ -1195,6 +1246,7 @@
   }
 
   function finishGame() {
+    SFX.fanfare();
     stopGameTimer();
     if (clearTimeEl) {
       const elapsedMs = gameStartTime !== null ? Date.now() - gameStartTime : 0;
@@ -1209,6 +1261,7 @@
   }
 
   function revealPhoto() {
+    SFX.reveal();
     btnReveal.hidden = true;
     photoWrap.hidden = false;
     btnRestart.hidden = false;
@@ -1216,6 +1269,7 @@
   }
 
   function restartGame() {
+    SFX.tap();
     if (stopConfetti) {
       stopConfetti();
       stopConfetti = null;
@@ -1230,7 +1284,34 @@
   // ------------------------------------------------------------
   // イベント登録
   // ------------------------------------------------------------
+  // iPad Safari は「音を鳴らすには先にユーザー操作が必要」という制約があるため、
+  // 画面のどこでも最初の1回タップされた時点でAudioContextをアンロックしておく
+  document.addEventListener(
+    "pointerdown",
+    function unlockAudioOnce() {
+      SFX.unlock();
+      document.removeEventListener("pointerdown", unlockAudioOnce);
+    },
+    { once: true }
+  );
+
+  function updateMuteIcon() {
+    if (!btnMute) return;
+    btnMute.textContent = SFX.isMuted() ? "🔇" : "🔊";
+  }
+
+  if (btnMute) {
+    btnMute.addEventListener("click", () => {
+      const isMutedNow = SFX.toggleMuted();
+      updateMuteIcon();
+      if (!isMutedNow) SFX.tap();
+    });
+    updateMuteIcon();
+  }
+
   btnStart.addEventListener("click", () => {
+    SFX.unlock();
+    SFX.gameStart();
     startGameTimer();
     loadStage(0);
   });
