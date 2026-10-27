@@ -11,7 +11,7 @@ import Carbon
 let toolDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents/gijiroku_tool", isDirectory: true)
 let enginePath = toolDir.appendingPathComponent("gijiroku").path
 let stateFile = toolDir.appendingPathComponent(".gijiroku_state.json")
-let minutesRoot = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents/議事録", isDirectory: true)
+let minutesRoot = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Desktop/議事録", isDirectory: true)
 
 let logFile = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/Gijiroku.log")
 

@@ -21,6 +21,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>LSUIElement</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Zoom 会議の音声（BlackHole）と自分のマイクを録音して文字起こしするために使用します。</string>
   <key>NSDocumentsFolderUsageDescription</key><string>録音・文字起こし・議事録を「書類」フォルダに保存するために使用します。</string>
+  <key>NSDesktopFolderUsageDescription</key><string>議事録を「デスクトップ」の議事録フォルダに保存するために使用します。</string>
 </dict>
 </plist>
 PLIST
